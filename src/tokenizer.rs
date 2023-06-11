@@ -1,18 +1,9 @@
-use crate::error::Error;
+use crate::error::{Error, Result};
 
 const BELL: char = '\u{0007}';
 const BACKSPACE: char = '\u{0008}';
 const VERTICAL_TAB: char = '\u{000b}';
 const FORM_FEED: char = '\u{000c}';
-
-/// An [`Iterator`] that converts a string of characters into [`Token`]s.
-pub(crate) struct Tokenizer {
-    text: Vec<char>,
-    read_index: usize,
-
-    line: usize,
-    column: usize,
-}
 
 /// All grammatical tokens defined by the CEL spec at
 /// https://github.com/google/cel-spec/blob/master/doc/langdef.md#syntax
@@ -98,6 +89,15 @@ impl StringOrBytes {
     }
 }
 
+/// An [`Iterator`] that converts a string of characters into [`Token`]s.
+pub(crate) struct Tokenizer {
+    text: Vec<char>,
+    read_index: usize,
+
+    line: usize,
+    column: usize,
+}
+
 impl Tokenizer {
     pub fn new(text: &str) -> Tokenizer {
         Tokenizer {
@@ -108,7 +108,7 @@ impl Tokenizer {
         }
     }
 
-    pub fn next_token(&mut self) -> Option<Result<Token, Error>> {
+    pub fn next_token(&mut self) -> Option<Result<Token>> {
         self.consume_whitespace();
 
         Some(match self.consume()? {
@@ -201,7 +201,7 @@ impl Tokenizer {
         chars
     }
 
-    fn consume_hex_digits_into_u32(&mut self, num_digits: usize) -> Result<u32, Error> {
+    fn consume_hex_digits_into_u32(&mut self, num_digits: usize) -> Result<u32> {
         let mut chars = String::with_capacity(num_digits);
         for _ in 0..num_digits {
             match self.consume() {
@@ -234,7 +234,7 @@ impl Tokenizer {
     /// reflects the implementation" and `1.` is NOT valid.
     ///
     /// Expects `initial_char` to be the first character of the integer literal
-    fn lex_numeric(&mut self, initial_char: char) -> Result<Token, Error> {
+    fn lex_numeric(&mut self, initial_char: char) -> Result<Token> {
         if initial_char == '0' && self.consume_if(|c| c == 'x').is_some() {
             let digits = self.consume_hex_digits();
 
@@ -333,7 +333,7 @@ impl Tokenizer {
         }
     }
 
-    fn lex_identifier_or_keyword(&mut self, initial_char: char) -> Result<Token, Error> {
+    fn lex_identifier_or_keyword(&mut self, initial_char: char) -> Result<Token> {
         let mut identifier = String::new();
         identifier.push(initial_char);
 
@@ -382,7 +382,7 @@ impl Tokenizer {
     /// error occurs *after* reading the quotations, Some(Err) is returned.
     ///
     /// Expects the first character of the string to already be consumed.
-    fn try_lex_string(&mut self, initial_char: char) -> Option<Result<Token, Error>> {
+    fn try_lex_string(&mut self, initial_char: char) -> Option<Result<Token>> {
         let mut index = 0;
         let next_three = [
             Some(initial_char),
@@ -429,7 +429,7 @@ impl Tokenizer {
     /// passed to `quote_type`.
     fn read_string_literal(
         &mut self, quote_type: char, ignore_escapes: bool, buffer: &mut StringOrBytes,
-    ) -> Result<(), Error>
+    ) -> Result<()>
     {
         debug_assert!(quote_type == '\'' || quote_type == '"');
 
@@ -495,7 +495,7 @@ impl Tokenizer {
     }
 
     /// Expects the leading `\` character to already be consumed
-    fn consume_string_escape(&mut self, buffer: &mut StringOrBytes) -> Result<(), Error> {
+    fn consume_string_escape(&mut self, buffer: &mut StringOrBytes) -> Result<()> {
         match self.consume() {
             Some('\\') => buffer.push_char('\\'),
             Some('?') => buffer.push_char('?'),
@@ -598,13 +598,13 @@ impl Tokenizer {
         }
     }
 
-    fn error<T>(&self, message: &str) -> Result<T, Error> {
+    fn error<T>(&self, message: &str) -> Result<T> {
         Err(Error::new(self.line, self.column, message))
     }
 
     /// Runtime assertions that will cleanly return an error during release mode to avoid potential
     /// denial of service exploits.
-    fn error_or_panic_if_debug<T>(&self, message: &str) -> Result<T, Error> {
+    fn error_or_panic_if_debug<T>(&self, message: &str) -> Result<T> {
         if cfg!(debug_assertions) {
             panic!("{}", message);
         } else {
@@ -612,7 +612,7 @@ impl Tokenizer {
         }
     }
 
-    fn error_eof_during<T>(&self, while_reading: &str) -> Result<T, Error> {
+    fn error_eof_during<T>(&self, while_reading: &str) -> Result<T> {
         self.error(&format!("end of file while reading {}", while_reading))
     }
 }

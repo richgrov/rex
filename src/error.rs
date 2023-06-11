@@ -22,3 +22,5 @@ impl fmt::Display for Error {
         write!(f, "{}:{}: {}", self.line, self.column, self.message)
     }
 }
+
+pub type Result<T> = core::result::Result<T, Error>;
