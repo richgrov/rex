@@ -20,6 +20,7 @@ pub(crate) enum Token {
     Star,
     Slash,
     Percent,
+    Comma,
     And,
     Or,
     Question,
@@ -123,6 +124,7 @@ impl Tokenizer {
             '*' => Ok(Token::Star),
             '/' => Ok(Token::Slash),
             '%' => Ok(Token::Percent),
+            ',' => Ok(Token::Comma),
             '?' => Ok(Token::Question),
             ':' => Ok(Token::Colon),
             // https://github.com/google/cel-spec/issues/137
@@ -627,17 +629,17 @@ mod tests {
     fn symbols() {
         let string = "
             ( ) [ ] ( ) + - * / %
-            && || ? : . = == ! != < <=
-            > >= as break const continue else for function if import
-            in let loop package namespace null return var void while
+            , && || ? : . = == ! != <
+            <= > >= as break const continue else for function
+            if import in let loop package namespace null return var void while
             true false
         ";
 
         let tokens = [
             LParen, RParen, LBracket, RBracket, LParen, RParen, Plus, Minus, Star, Slash, Percent,
-            And, Or, Question, Colon, Dot, Equal, EqualEqual, Not, NotEqual, LessThan, LessEqual,
-            GreaterThan, GreaterEqual, As, Break, Const, Continue, Else, For, Function, If, Import,
-            In, Let, Loop, Package, Namespace, Null, Return, Var, Void, While,
+            Comma, And, Or, Question, Colon, Dot, Equal, EqualEqual, Not, NotEqual, LessThan,
+            LessEqual, GreaterThan, GreaterEqual, As, Break, Const, Continue, Else, For, Function,
+            If, Import, In, Let, Loop, Package, Namespace, Null, Return, Var, Void, While,
             Bool(true), Bool(false),
         ];
 
