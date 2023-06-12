@@ -1,18 +1,20 @@
 use crate::error::{Error, Result};
 use crate::expression::*;
-use crate::tokenizer::Token;
+use crate::tokenizer::{Token, TokenType};
 use crate::value::Value;
 
 pub(crate) fn parse(tokens: &[Token]) -> Result<BoxedExpr> {
     let mut parser = Parser {
         tokens,
         read_index: 0,
+        line: 1,
+        column: 1,
     };
 
     let expr = parser.parse_expr()?;
 
     if parser.read_index < parser.tokens.len() {
-        return Err(Error::new(0, 0, "unexpected code after expression"))
+        return parser.error("unexpected code after expression")
     }
 
     Ok(expr)
@@ -21,16 +23,18 @@ pub(crate) fn parse(tokens: &[Token]) -> Result<BoxedExpr> {
 struct Parser<'a> {
     tokens: &'a[Token],
     read_index: usize,
+    line: usize,
+    column: usize,
 }
 
 impl<'a> Parser<'a> {
     fn parse_expr(&mut self) -> Result<BoxedExpr> {
         let mut expr = self.parse_or()?;
 
-        while self.consume_if(Token::Question) {
+        while self.consume_if(TokenType::Question) {
             let when_true = self.parse_or()?;
-            if !self.consume_if(Token::Colon) {
-                return Err(Error::new(0, 0, "expected colon following terenary"))
+            if !self.consume_if(TokenType::Colon) {
+                return self.error("expected colon following terenary")
             }
             let when_false = self.parse_expr()?;
 
@@ -47,7 +51,7 @@ impl<'a> Parser<'a> {
     fn parse_or(&mut self) -> Result<BoxedExpr> {
         let mut expr = self.parse_and()?;
 
-        while self.consume_if(Token::Or) {
+        while self.consume_if(TokenType::Or) {
             expr = Box::new(BinaryExpr {
                 left: expr,
                 operator: BinaryOperator::Or,
@@ -61,7 +65,7 @@ impl<'a> Parser<'a> {
     fn parse_and(&mut self) -> Result<BoxedExpr> {
         let mut expr = self.parse_relative()?;
 
-        while self.consume_if(Token::And) {
+        while self.consume_if(TokenType::And) {
             expr = Box::new(BinaryExpr {
                 left: expr,
                 operator: BinaryOperator::And,
@@ -79,13 +83,13 @@ impl<'a> Parser<'a> {
             match self.peek() {
                 Some(t) => {
                     let operator = match t {
-                        Token::GreaterThan => BinaryOperator::GreaterThan,
-                        Token::GreaterEqual => BinaryOperator::GreaterEqual,
-                        Token::LessEqual => BinaryOperator::LessEqual,
-                        Token::LessThan => BinaryOperator::LessThan,
-                        Token::EqualEqual => BinaryOperator::Equal,
-                        Token::NotEqual => BinaryOperator::NotEqual,
-                        Token::In => BinaryOperator::In,
+                        TokenType::GreaterThan => BinaryOperator::GreaterThan,
+                        TokenType::GreaterEqual => BinaryOperator::GreaterEqual,
+                        TokenType::LessEqual => BinaryOperator::LessEqual,
+                        TokenType::LessThan => BinaryOperator::LessThan,
+                        TokenType::EqualEqual => BinaryOperator::Equal,
+                        TokenType::NotEqual => BinaryOperator::NotEqual,
+                        TokenType::In => BinaryOperator::In,
                         _ => break,
                     };
                     self.consume();
@@ -110,8 +114,8 @@ impl<'a> Parser<'a> {
             match self.peek() {
                 Some(t) => {
                     let operator = match t {
-                        Token::Plus => BinaryOperator::Add,
-                        Token::Minus => BinaryOperator::Sub,
+                        TokenType::Plus => BinaryOperator::Add,
+                        TokenType::Minus => BinaryOperator::Sub,
                         _ => break,
                     };
                     self.consume();
@@ -136,9 +140,9 @@ impl<'a> Parser<'a> {
             match self.peek() {
                 Some(t) => {
                     let operator = match t {
-                        Token::Star => BinaryOperator::Multiply,
-                        Token::Slash => BinaryOperator::Divide,
-                        Token::Percent => BinaryOperator::Remainder,
+                        TokenType::Star => BinaryOperator::Multiply,
+                        TokenType::Slash => BinaryOperator::Divide,
+                        TokenType::Percent => BinaryOperator::Remainder,
                         _ => break,
                     };
                     self.consume();
@@ -158,8 +162,8 @@ impl<'a> Parser<'a> {
 
     fn parse_unary(&mut self) -> Result<BoxedExpr> {
         let operator = match self.peek() {
-            Some(Token::Not) => UnaryOperator::Not,
-            Some(Token::Minus) => UnaryOperator::Negate,
+            Some(TokenType::Not) => UnaryOperator::Not,
+            Some(TokenType::Minus) => UnaryOperator::Negate,
             _ => return self.parse_member()
         };
         self.consume();
@@ -174,10 +178,10 @@ impl<'a> Parser<'a> {
         let mut expr = self.parse_primary()?;
 
         loop {
-            if self.consume_if(Token::Dot) {
+            if self.consume_if(TokenType::Dot) {
                 let ident = match self.consume() {
-                    Some(Token::Identifier(s)) => s,
-                    _ => return Err(Error::new(0, 0, "expected identifier following '.'")),
+                    Some(TokenType::Identifier(s)) => s,
+                    _ => return self.error("expected identifier following '.'"),
                 };
 
                 expr = Box::new(AccessorExpr {
@@ -186,15 +190,15 @@ impl<'a> Parser<'a> {
                         value: Value::String(ident.to_owned())
                     }),
                 });
-            } else if self.consume_if(Token::LParen) {
+            } else if self.consume_if(TokenType::LParen) {
                 expr = Box::new(CallExpr {
                     expr,
                     arguments: self.parse_function_args()?,
                 });
-            } else if self.consume_if(Token::LBracket) {
+            } else if self.consume_if(TokenType::LBracket) {
                 let accessor = self.parse_expr()?;
-                if !self.consume_if(Token::RBracket) {
-                    return Err(Error::new(0, 0, "expected closing bracket after index access"))
+                if !self.consume_if(TokenType::RBracket) {
+                    return self.error("expected closing bracket after index access")
                 }
 
                 expr = Box::new(AccessorExpr {
@@ -214,20 +218,20 @@ impl<'a> Parser<'a> {
         let mut arguments = Vec::new();
 
         loop {
-            if self.consume_if(Token::RParen) {
+            if self.consume_if(TokenType::RParen) {
                 break
             }
 
             arguments.push(self.parse_expr()?);
 
-            if self.consume_if(Token::Comma) {
+            if self.consume_if(TokenType::Comma) {
                 continue
             }
 
-            if self.consume_if(Token::RParen) {
+            if self.consume_if(TokenType::RParen) {
                 break
             } else {
-                return Err(Error::new(0, 0, "expected closing parenthesis after arguments"))
+                return self.error("expected closing parenthesis after arguments")
             }
         }
 
@@ -235,11 +239,16 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_primary(&mut self) -> Result<BoxedExpr> {
-        match self.consume() {
-            Some(Token::LParen) => {
+        let token = match self.consume() {
+            Some(t) => t,
+            None => return self.error("expected expression"),
+        };
+
+        match token {
+            TokenType::LParen => {
                 let expr = self.parse_expr()?;
-                if !self.consume_if(Token::RParen) {
-                    return Err(Error::new(0, 0, "expected closing parenthesis"))
+                if !self.consume_if(TokenType::RParen) {
+                    return self.error("expected closing parenthesis")
                 }
 
                 Ok(Box::new(GroupingExpr {
@@ -247,38 +256,37 @@ impl<'a> Parser<'a> {
                 }))
             },
 
-            Some(Token::LBracket) => Ok(Box::new(ListExpr {
+            TokenType::LBracket => Ok(Box::new(ListExpr {
                 expressions: self.parse_list_literal()?,
             })),
             
-            Some(Token::LBrace) => Ok(Box::new(MapExpr {
+            TokenType::LBrace => Ok(Box::new(MapExpr {
                 pairs: self.parse_map_literal()?,
             })),
 
-            Some(Token::Dot) => {
+            TokenType::Dot => {
                 let identifier = match self.peek() {
-                    Some(Token::Identifier(s)) => s.to_owned(),
-                    _ => return Err(Error::new(0, 0, "expected identifier for global resolution")),
+                    Some(TokenType::Identifier(s)) => s.to_owned(),
+                    _ => return self.error("expected identifier for global resolution"),
                 };
 
                 self.consume();
                 Ok(Box::new(GlobalExpr { identifier }))
             },
 
-            Some(Token::Identifier(s)) => Ok(Box::new(IdentifierExpr {
+            TokenType::Identifier(s) => Ok(Box::new(IdentifierExpr {
                 identifier: s.to_owned(),
             })),
 
-            Some(other) => {
+            other => {
                 match Value::try_from(other) {
                     Ok(value) => Ok(Box::new(ValueExpr {
                         value,
                     })),
-                    Err(_) => Err(Error::new(0, 0, "expected expression")),
+                    Err(_) => self.error("expected expression"),
                 }
             },
 
-            None => Err(Error::new(0, 0, "expected expression")),
         }
     }
 
@@ -287,20 +295,20 @@ impl<'a> Parser<'a> {
         let mut expressions = Vec::new();
 
         loop {
-            if self.consume_if(Token::RBracket) {
+            if self.consume_if(TokenType::RBracket) {
                 break
             }
             
             expressions.push(self.parse_expr()?);
 
-            if self.consume_if(Token::Comma) {
+            if self.consume_if(TokenType::Comma) {
                 continue
             }
 
-            if self.consume_if(Token::RBracket) {
+            if self.consume_if(TokenType::RBracket) {
                 break
             } else {
-                return Err(Error::new(0, 0, "expected closing bracket after list"))
+                return self.error("expected closing bracket after list")
             }
         }
 
@@ -312,47 +320,52 @@ impl<'a> Parser<'a> {
         let mut pairs = Vec::new();
 
         loop {
-            if self.consume_if(Token::RBrace) {
+            if self.consume_if(TokenType::RBrace) {
                 break
             }
 
             let key = self.parse_expr()?;
-            if !self.consume_if(Token::Colon) {
-                return Err(Error::new(0, 0,"expected colon after map key"))
+            if !self.consume_if(TokenType::Colon) {
+                return self.error("expected colon after map key")
             }
             let value = self.parse_expr()?;
             pairs.push((key, value));
 
-            if self.consume_if(Token::Comma) {
+            if self.consume_if(TokenType::Comma) {
                 continue
             }
 
-            if self.consume_if(Token::RBrace) {
+            if self.consume_if(TokenType::RBrace) {
                 break
             } else {
-                return Err(Error::new(0, 0, "expected closing brace after map"))
+                return self.error("expected closing brace after map")
             }
         }
 
         Ok(pairs)
     }
 
-    fn peek(&self) -> Option<&Token> {
+    fn peek(&self) -> Option<&TokenType> {
         self.get_at(self.read_index)
     }
 
-    fn get_at(&self, index: usize) -> Option<&Token> {
-        self.tokens.get(index)
+    fn get_at(&self, index: usize) -> Option<&TokenType> {
+        self.tokens.get(index).map(|tok| tok.ty())
     }
 
-    fn consume(&mut self) -> Option<&Token> {
+    fn consume(&mut self) -> Option<&TokenType> {
         match self.tokens.get(self.read_index) {
-            Some(t) => { self.read_index += 1; Some(t) },
+            Some(t) => {
+                self.read_index += 1;
+                self.line = t.line();
+                self.column = t.column();
+                Some(t.ty())
+            },
             None => None,
         }
     }
 
-    fn consume_if(&mut self, variant: Token) -> bool {
+    fn consume_if(&mut self, variant: TokenType) -> bool {
         use std::mem::discriminant;
 
         match self.peek() {
@@ -362,6 +375,10 @@ impl<'a> Parser<'a> {
             },
             _ => false,
         }
+    }
+
+    fn error<T>(&self, msg: &str) -> Result<T> {
+        Err(Error::new(self.line, self.column, msg))
     }
 }
 

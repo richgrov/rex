@@ -8,7 +8,7 @@ const FORM_FEED: char = '\u{000c}';
 /// All grammatical tokens defined by the CEL spec at
 /// https://github.com/google/cel-spec/blob/master/doc/langdef.md#syntax
 #[derive(Debug, PartialEq)]
-pub(crate) enum Token {
+pub(crate) enum TokenType {
     LParen,
     RParen,
     LBracket,
@@ -64,6 +64,28 @@ pub(crate) enum Token {
     Bytes(Vec<u8>),
 }
 
+#[derive(Debug)]
+pub(crate) struct Token {
+    ty: TokenType,
+    line: usize,
+    /// The position of the first character that was found to parse the token
+    column: usize,
+}
+
+impl Token {
+    pub fn ty(&self) -> &TokenType {
+        &self.ty
+    }
+
+    pub fn line(&self) -> usize {
+        self.line
+    }
+
+    pub fn column(&self) -> usize {
+        self.column
+    }
+}
+
 /// Used to differentiate string literals from byte literals during parsing. For example, '\xFF'
 /// will contain character 'ÿ' encoded as [195, 191] while b'\xFF' will simply contain 0xFF.
 enum StringOrBytes {
@@ -97,6 +119,9 @@ pub(crate) struct Tokenizer {
 
     line: usize,
     column: usize,
+
+    token_start_line: usize,
+    token_start_column: usize,
 }
 
 impl Tokenizer {
@@ -105,49 +130,75 @@ impl Tokenizer {
             text: text.chars().collect(),
             read_index: 0,
             line: 1,
-            column: 1,
+            // Consuming the first character will set the column to 1
+            column: 0,
+
+            token_start_line: 1,
+            token_start_column: 0,
         }
     }
 
     pub fn next_token(&mut self) -> Option<Result<Token>> {
         self.consume_whitespace();
 
+        self.token_start_line = self.line;
+        self.token_start_column = self.column + 1;
+
         Some(match self.consume()? {
-            '(' => Ok(Token::LParen),
-            ')' => Ok(Token::RParen),
-            '[' => Ok(Token::LBracket),
-            ']' => Ok(Token::RBracket),
-            '{' => Ok(Token::LBrace),
-            '}' => Ok(Token::RBrace),
-            '+' => Ok(Token::Plus),
-            '-' => Ok(Token::Minus),
-            '*' => Ok(Token::Star),
-            '/' => Ok(Token::Slash),
-            '%' => Ok(Token::Percent),
-            ',' => Ok(Token::Comma),
-            '?' => Ok(Token::Question),
-            ':' => Ok(Token::Colon),
+            '(' => self.token(TokenType::LParen),
+            ')' => self.token(TokenType::RParen),
+            '[' => self.token(TokenType::LBracket),
+            ']' => self.token(TokenType::RBracket),
+            '{' => self.token(TokenType::LBrace),
+            '}' => self.token(TokenType::RBrace),
+            '+' => self.token(TokenType::Plus),
+            '-' => self.token(TokenType::Minus),
+            '*' => self.token(TokenType::Star),
+            '/' => self.token(TokenType::Slash),
+            '%' => self.token(TokenType::Percent),
+            ',' => self.token(TokenType::Comma),
+            '?' => self.token(TokenType::Question),
+            ':' => self.token(TokenType::Colon),
             // https://github.com/google/cel-spec/issues/137
             '.' => if let Some(_) = self.next_is(|c| c.is_ascii_digit()) {
                 self.lex_numeric('.')
             } else {
-                Ok(Token::Dot)
+                self.token(TokenType::Dot)
             },
 
-            '=' => Ok(if self.consume_if(|c| c == '=').is_some() { Token::EqualEqual } else { Token::Equal }),
-            '!' => Ok(if self.consume_if(|c| c == '=').is_some() { Token::NotEqual} else { Token::Not }),
-            '<' => Ok(if self.consume_if(|c| c == '=').is_some() { Token::LessEqual } else { Token::LessThan }),
-            '>' => Ok(if self.consume_if(|c| c == '=').is_some() { Token::GreaterEqual } else { Token::GreaterThan }),
+            '=' => if self.consume_if(|c| c == '=').is_some() {
+                self.token(TokenType::EqualEqual)
+            } else {
+                self.token(TokenType::Equal)
+            },
+
+            '!' => if self.consume_if(|c| c == '=').is_some() {
+                self.token(TokenType::NotEqual)
+            } else {
+                self.token(TokenType::Not)
+            },
+
+            '<' => if self.consume_if(|c| c == '=').is_some() {
+                self.token(TokenType::LessEqual)
+            } else {
+                self.token(TokenType::LessThan)
+            },
+
+            '>' => if self.consume_if(|c| c == '=').is_some() {
+                self.token(TokenType::GreaterEqual)
+            } else {
+                self.token(TokenType::GreaterThan)
+            },
 
             '&' => match self.consume() {
-                Some('&') => Ok(Token::And),
+                Some('&') => self.token(TokenType::And),
                 Some(_) => self.error(
                     "unexpected character following '&'. Only logical AND (&&) operator is supported"
                 ),
                 None => self.error_eof_during("logical AND operator"),
             },
             '|' => match self.consume() {
-                Some('|') => Ok(Token::Or),
+                Some('|') => self.token(TokenType::Or),
                 Some(_) => self.error(
                     "unexpected character following '|'. Only logical OR (||) operator is supported"
                 ),
@@ -244,7 +295,7 @@ impl Tokenizer {
                 self.error("\"0x\" must be followed by at least one hexadecimal character")
             } else {
                 match i64::from_str_radix(&digits, 16) {
-                    Ok(i) => Ok(Token::Int(i)),
+                    Ok(i) => self.token(TokenType::Int(i)),
                     Err(e) => self.error_or_panic_if_debug(
                         &format!("consuming hexadecimal failed: {}", e)
                     ),
@@ -311,28 +362,28 @@ impl Tokenizer {
             unsigned = true;
         }
 
-        if float {
+        self.token(if float {
             match chars.parse() {
-                Ok(f) => Ok(Token::Float(f)),
-                Err(e) => self.error_or_panic_if_debug(
+                Ok(f) => TokenType::Float(f),
+                Err(e) => return self.error_or_panic_if_debug(
                     &format!("consuming float failed: {}", e)
                 ),
             }
         } else if unsigned {
             match chars.parse() {
-                Ok(i) => Ok(Token::Uint(i)),
-                Err(e) => self.error_or_panic_if_debug(
+                Ok(i) => TokenType::Uint(i),
+                Err(e) => return self.error_or_panic_if_debug(
                     &format!("consuming unsigned integer failed: {}", e)
                 ),
             }
         } else {
             match chars.parse() {
-                Ok(i) => Ok(Token::Int(i)),
-                Err(e) => self.error_or_panic_if_debug(
+                Ok(i) => TokenType::Int(i),
+                Err(e) => return self.error_or_panic_if_debug(
                     &format!("consuming integer failed: {}", e)
                 ),
             }
-        }
+        })
     }
 
     fn lex_identifier_or_keyword(&mut self, initial_char: char) -> Result<Token> {
@@ -353,29 +404,29 @@ impl Tokenizer {
             }
         }
 
-        Ok(match identifier.as_str() {
-            "as" => Token::As,
-            "break" => Token::Break,
-            "const" => Token::Const,
-            "continue" => Token::Continue,
-            "else" => Token::Else,
-            "false" => Token::Bool(false),
-            "for" => Token::For,
-            "function" => Token::Function,
-            "if" => Token::If,
-            "import" => Token::Import,
-            "in" => Token::In,
-            "let" => Token::Let,
-            "loop" => Token::Loop,
-            "namespace" => Token::Namespace,
-            "null" => Token::Null,
-            "package" => Token::Package,
-            "return" => Token::Return,
-            "true" => Token::Bool(true),
-            "var" => Token::Var,
-            "void" => Token::Void,
-            "while" => Token::While,
-            _ => Token::Identifier(identifier),
+        self.token(match identifier.as_str() {
+            "as" => TokenType::As,
+            "break" => TokenType::Break,
+            "const" => TokenType::Const,
+            "continue" => TokenType::Continue,
+            "else" => TokenType::Else,
+            "false" => TokenType::Bool(false),
+            "for" => TokenType::For,
+            "function" => TokenType::Function,
+            "if" => TokenType::If,
+            "import" => TokenType::Import,
+            "in" => TokenType::In,
+            "let" => TokenType::Let,
+            "loop" => TokenType::Loop,
+            "namespace" => TokenType::Namespace,
+            "null" => TokenType::Null,
+            "package" => TokenType::Package,
+            "return" => TokenType::Return,
+            "true" => TokenType::Bool(true),
+            "var" => TokenType::Var,
+            "void" => TokenType::Void,
+            "while" => TokenType::While,
+            _ => TokenType::Identifier(identifier),
         })
     }
 
@@ -416,9 +467,9 @@ impl Tokenizer {
                 };
 
                 Some(match self.read_string_literal(c, raw_literal, &mut buffer) {
-                    Ok(_) => Ok(match buffer {
-                        StringOrBytes::String(s) => Token::String(s),
-                        StringOrBytes::Bytes(b) => Token::Bytes(b),
+                    Ok(_) => self.token(match buffer {
+                        StringOrBytes::String(s) => TokenType::String(s),
+                        StringOrBytes::Bytes(b) => TokenType::Bytes(b),
                     }),
                     Err(e) => Err(e),
                 })
@@ -584,7 +635,7 @@ impl Tokenizer {
         let c = self.peek()?;
         if c == '\n' {
             self.line += 1;
-            self.column = 1;
+            self.column = 0; // Consuming the first character will set the column to 1
         } else {
             self.column +=1 ;
         }
@@ -598,6 +649,14 @@ impl Tokenizer {
             Some(c) if f(c) => self.consume(),
             _ => None,
         }
+    }
+
+    fn token(&self, ty: TokenType) -> Result<Token> {
+        Ok(Token {
+            ty,
+            line: self.token_start_line,
+            column: self.token_start_column,
+        })
     }
 
     fn error<T>(&self, message: &str) -> Result<T> {
@@ -621,9 +680,8 @@ impl Tokenizer {
 
 #[cfg(test)]
 mod tests {
-    use super::Tokenizer;
-    use super::Token;
-    use Token::*;
+    use super::{Tokenizer, Token, TokenType};
+    use TokenType::*;
 
     #[test]
     fn symbols() {
@@ -665,7 +723,7 @@ mod tests {
         assert_equal_tokens(string, &tokens);
 
         let mut tokenizer = Tokenizer::new("1dentifier");
-        assert_ne!(tokenizer.next_token(), Some(Ok(Identifier("1dentifier".to_string()))));
+        assert_ne!(*tokenizer.next_token().unwrap().unwrap().ty(), Identifier("1dentifier".to_string()));
     }
 
     #[test]
@@ -767,11 +825,33 @@ mod tests {
         assert_error(r#"b'\U10FFFF'"#);
     }
 
-    fn assert_equal_tokens(s: &str, tokens: &[Token]) {
+    #[test]
+    fn token_positions() {
+        let string = "myVar \nconst +\n  0.01 'test'";
+
+        let mut tokenizer = Tokenizer::new(string);
+        let mut tokens = Vec::new();
+        while let Some(tok) = tokenizer.next_token() {
+            tokens.push(tok.unwrap());
+        }
+
+        fn assert_pos(token: &Token, line: usize, column: usize) {
+            assert!(token.line() == line);
+            assert!(token.column() == column);
+        }
+
+        assert_pos(&tokens[0], 1, 1);
+        assert_pos(&tokens[1], 2, 1);
+        assert_pos(&tokens[2], 2, 7);
+        assert_pos(&tokens[3], 3, 3);
+        assert_pos(&tokens[4], 3, 8);
+    }
+
+    fn assert_equal_tokens(s: &str, tokens: &[TokenType]) {
         let mut tokenizer = Tokenizer::new(s);
         for (i, tok1) in tokens.iter().enumerate() {
             let tok2 = tokenizer.next_token().unwrap().unwrap();
-            assert_eq!(*tok1, tok2, "entry number {}", i + 1);
+            assert_eq!(*tok1, *tok2.ty(), "entry number {}", i + 1);
         }
 
         match tokenizer.next_token() {
