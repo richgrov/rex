@@ -442,7 +442,6 @@ mod tests {
             "{one: two, 'three': four, five: six}",
             "{one: two, 'three': four, five: six,}",
             "1",
-            "1u",
             "1.0",
             "true && false",
             "'test'",

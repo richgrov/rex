@@ -57,9 +57,7 @@ pub(crate) enum TokenType {
 
     Identifier(String),
     Bool(bool),
-    Int(i64),
-    Uint(u64),
-    Float(f64),
+    Number(f64),
     String(String),
     Bytes(Vec<u8>),
 }
@@ -275,16 +273,11 @@ impl Tokenizer {
 
     /// Reads any of the following integer literals:
     /// `1`
-    /// `1u`
     /// `.1`
     /// `1.0`
     /// `1.0e0`
     /// `1e0`
     /// `0x1`
-    ///
-    /// Per https://github.com/google/cel-spec/issues/137, CEL is contradictory as whether or not
-    /// `1.` is a valid literal. We will be going by the ruling that "the lexis accurately
-    /// reflects the implementation" and `1.` is NOT valid.
     ///
     /// Expects `initial_char` to be the first character of the integer literal
     fn lex_numeric(&mut self, initial_char: char) -> Result<Token> {
@@ -295,7 +288,7 @@ impl Tokenizer {
                 self.error("\"0x\" must be followed by at least one hexadecimal character")
             } else {
                 match i64::from_str_radix(&digits, 16) {
-                    Ok(i) => self.token(TokenType::Int(i)),
+                    Ok(i) => self.token(TokenType::Number(i as f64)),
                     Err(e) => self.error_or_panic_if_debug(
                         &format!("consuming hexadecimal failed: {}", e)
                     ),
@@ -306,12 +299,7 @@ impl Tokenizer {
         let mut chars = String::new();
         chars.push(initial_char);
 
-        let mut float = false;
-        let mut unsigned = false;
-
         if initial_char == '.' {
-            float = true;
-
             let digits = self.consume_digits();
             if digits.is_empty() {
                 // This should panic because `initial_char` was a period. This function can only be
@@ -323,14 +311,12 @@ impl Tokenizer {
             chars += &self.consume_digits();
         
             if self.consume_if(|c| c == '.').is_some() {
-                float = true;
                 chars.push('.');
 
                 let digits = self.consume_digits();
                 if digits.is_empty() {
                     return self.error(
-                        "floating-point literals must be followed by at least one number. See \
-                        https://github.com/google/cel-spec/issues/137 for more details"
+                        "floating-point literals must be followed by at least one number"
                     )
                 }
                 chars += &digits;
@@ -338,8 +324,6 @@ impl Tokenizer {
         }
 
         if self.consume_if(|c| c == 'e' || c == 'E').is_some() {
-            float = true; // CEL grammar only defines the 'e' suffix for floating-point numbers
-                          // only. So having an 'e' after an integer literal changes it to a float
             chars.push('e');
 
             if self.consume_if(|c| c == '+').is_none() && self.consume_if(|c| c == '-').is_some() {
@@ -353,36 +337,11 @@ impl Tokenizer {
             chars += &digits;
         }
 
-        if self.consume_if(|c| c == 'u' || c == 'U').is_some() {
-            if float {
-                return self.error(
-                    "floating-point numbers (or numbers with an exponent) cannot be unsigned"
-                )
-            }
-            unsigned = true;
-        }
-
-        self.token(if float {
-            match chars.parse() {
-                Ok(f) => TokenType::Float(f),
-                Err(e) => return self.error_or_panic_if_debug(
-                    &format!("consuming float failed: {}", e)
-                ),
-            }
-        } else if unsigned {
-            match chars.parse() {
-                Ok(i) => TokenType::Uint(i),
-                Err(e) => return self.error_or_panic_if_debug(
-                    &format!("consuming unsigned integer failed: {}", e)
-                ),
-            }
-        } else {
-            match chars.parse() {
-                Ok(i) => TokenType::Int(i),
-                Err(e) => return self.error_or_panic_if_debug(
-                    &format!("consuming integer failed: {}", e)
-                ),
-            }
+        self.token(match chars.parse() {
+            Ok(n) => TokenType::Number(n),
+            Err(e) => return self.error_or_panic_if_debug(
+                &format!("consuming number failed: {}", e)
+            ),
         })
     }
 
@@ -729,27 +688,25 @@ mod tests {
     #[test]
     fn numeric() {
         let string = "
-            1 2u .3 0.4 .5e1 .6e+2 .7e-1
-            0.8e3 0.9e+4 0.11e-5
+            1 .2 0.3 .4e1 .5e+2 .6e-1
+            0.7e3 0.8e+4 0.99e-5
         ";
 
         let tokens = [
-            Int(1),
-            Uint(2),
-            Float(0.3),
-            Float(0.4),
-            Float(0.5e1),
-            Float(0.6e2),
-            Float(0.7e-1),
-            Float(0.8e3),
-            Float(0.9e4),
-            Float(0.11e-5),
+            Number(1.0),
+            Number(0.2),
+            Number(0.3),
+            Number(0.4e1),
+            Number(0.5e2),
+            Number(0.6e-1),
+            Number(0.7e3),
+            Number(0.8e4),
+            Number(0.99e-5),
         ];
 
         assert_equal_tokens(string, &tokens);
 
         assert_error("1.");
-        assert_error("2.0u");
     }
 
     #[test]
@@ -757,10 +714,10 @@ mod tests {
         let string = "0x1 0x02 0x102030 0xCafeBabe";
 
         let tokens = [
-            Int(1),
-            Int(2),
-            Int(0x102030),
-            Int(0xCAFEBABE),
+            Number(1.0),
+            Number(2.0),
+            Number(0x102030 as f64),
+            Number(0xCAFEBABE as i64 as f64),
         ];
 
         assert_equal_tokens(string, &tokens);
