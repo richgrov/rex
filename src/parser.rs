@@ -30,6 +30,8 @@ struct Parser<'a> {
 impl<'a> Parser<'a> {
     fn parse_expr(&mut self) -> Result<BoxedExpr> {
         let mut expr = self.parse_or()?;
+        let line = self.line;
+        let column = self.column;
 
         while self.consume_if(TokenType::Question) {
             let when_true = self.parse_or()?;
@@ -39,6 +41,8 @@ impl<'a> Parser<'a> {
             let when_false = self.parse_expr()?;
 
             expr = Box::new(ConditionalExpr {
+                line,
+                column,
                 condition: expr,
                 when_true,
                 when_false,
@@ -53,6 +57,8 @@ impl<'a> Parser<'a> {
 
         while self.consume_if(TokenType::Or) {
             expr = Box::new(BinaryExpr {
+                line: self.line,
+                column: self.column,
                 left: expr,
                 operator: BinaryOperator::Or,
                 right: self.parse_and()?,
@@ -67,6 +73,8 @@ impl<'a> Parser<'a> {
 
         while self.consume_if(TokenType::And) {
             expr = Box::new(BinaryExpr {
+                line: self.line,
+                column: self.column,
                 left: expr,
                 operator: BinaryOperator::And,
                 right: self.parse_relative()?,
@@ -95,6 +103,8 @@ impl<'a> Parser<'a> {
                     self.consume();
 
                     expr = Box::new(BinaryExpr {
+                        line: self.line,
+                        column: self.column,
                         left: expr,
                         operator,
                         right: self.parse_addition()?,
@@ -121,6 +131,8 @@ impl<'a> Parser<'a> {
                     self.consume();
 
                     expr = Box::new(BinaryExpr {
+                        line: self.line,
+                        column: self.column,
                         left: expr,
                         operator,
                         right: self.parse_multiplication()?,
@@ -148,6 +160,8 @@ impl<'a> Parser<'a> {
                     self.consume();
 
                     expr = Box::new(BinaryExpr {
+                        line: self.line,
+                        column: self.column,
                         left: expr,
                         operator,
                         right: self.parse_unary()?,
@@ -169,6 +183,8 @@ impl<'a> Parser<'a> {
         self.consume();
 
         Ok(Box::new(UnaryExpr {
+            line: self.line,
+            column: self.column,
             operator,
             expr: self.parse_member()?,
         }))
@@ -179,29 +195,44 @@ impl<'a> Parser<'a> {
 
         loop {
             if self.consume_if(TokenType::Dot) {
+                let line = self.line;
+                let column = self.column;
+
                 let ident = match self.consume() {
                     Some(TokenType::Identifier(s)) => s,
                     _ => return self.error("expected identifier following '.'"),
                 };
 
                 expr = Box::new(AccessorExpr {
+                    line,
+                    column,
                     expr,
                     accessor: Box::new(ValueExpr {
                         value: Value::String(ident.to_owned())
                     }),
                 });
             } else if self.consume_if(TokenType::LParen) {
+                let line = self.line;
+                let column = self.column;
+
                 expr = Box::new(CallExpr {
+                    line,
+                    column,
                     expr,
                     arguments: self.parse_function_args()?,
                 });
             } else if self.consume_if(TokenType::LBracket) {
+                let line = self.line;
+                let column = self.column;
+
                 let accessor = self.parse_expr()?;
                 if !self.consume_if(TokenType::RBracket) {
                     return self.error("expected closing bracket after index access")
                 }
 
                 expr = Box::new(AccessorExpr {
+                    line,
+                    column,
                     expr,
                     accessor,
                 });

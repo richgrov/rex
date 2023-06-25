@@ -5,6 +5,8 @@ pub(crate) trait Expr {}
 pub(crate) type BoxedExpr = Box<dyn Expr>;
 
 pub(crate) struct ConditionalExpr {
+    pub line: usize,
+    pub column: usize,
     pub condition: Box<dyn Expr>,
     pub when_true: Box<dyn Expr>,
     pub when_false: Box<dyn Expr>,
@@ -31,6 +33,8 @@ pub(crate) enum BinaryOperator {
 }
 
 pub(crate) struct BinaryExpr {
+    pub line: usize,
+    pub column: usize,
     pub left: Box<dyn Expr>,
     pub operator: BinaryOperator,
     pub right: Box<dyn Expr>,
@@ -44,6 +48,8 @@ pub(crate) enum UnaryOperator {
 }
 
 pub(crate) struct UnaryExpr {
+    pub line: usize,
+    pub column: usize,
     pub operator: UnaryOperator,
     pub expr: Box<dyn Expr>,
 }
@@ -53,6 +59,8 @@ impl Expr for UnaryExpr {
 }
 
 pub(crate) struct AccessorExpr {
+    pub line: usize,
+    pub column: usize,
     pub expr: Box<dyn Expr>,
     pub accessor: Box<dyn Expr>,
 }
@@ -62,6 +70,8 @@ impl Expr for AccessorExpr {
 }
 
 pub(crate) struct CallExpr {
+    pub line: usize,
+    pub column: usize,
     pub expr: Box<dyn Expr>,
     pub arguments: Vec<Box<dyn Expr>>,
 }
