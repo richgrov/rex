@@ -1,5 +1,5 @@
 [package]
-name = "cel-jit"
+name = "rex"
 version = "0.1.0"
 edition = "2021"
 
