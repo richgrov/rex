@@ -38,22 +38,14 @@ pub(crate) enum TokenType {
     As,
     Break,
     Const,
-    Continue,
     Else,
-    For,
     Function,
     If,
-    Import,
     In,
     Let,
-    Loop,
-    Package,
-    Namespace,
     Null,
     Return,
     Var,
-    Void,
-    While,
 
     Identifier(String),
     Bool(bool),
@@ -367,24 +359,16 @@ impl Tokenizer {
             "as" => TokenType::As,
             "break" => TokenType::Break,
             "const" => TokenType::Const,
-            "continue" => TokenType::Continue,
             "else" => TokenType::Else,
             "false" => TokenType::Bool(false),
-            "for" => TokenType::For,
             "function" => TokenType::Function,
             "if" => TokenType::If,
-            "import" => TokenType::Import,
             "in" => TokenType::In,
             "let" => TokenType::Let,
-            "loop" => TokenType::Loop,
-            "namespace" => TokenType::Namespace,
             "null" => TokenType::Null,
-            "package" => TokenType::Package,
             "return" => TokenType::Return,
             "true" => TokenType::Bool(true),
             "var" => TokenType::Var,
-            "void" => TokenType::Void,
-            "while" => TokenType::While,
             _ => TokenType::Identifier(identifier),
         })
     }
@@ -647,17 +631,15 @@ mod tests {
         let string = "
             ( ) [ ] ( ) + - * / %
             , && || ? : . = == ! != <
-            <= > >= as break const continue else for function
-            if import in let loop package namespace null return var void while
-            true false
+            <= > >= as break const else function if in let
+            null return var true false
         ";
 
         let tokens = [
             LParen, RParen, LBracket, RBracket, LParen, RParen, Plus, Minus, Star, Slash, Percent,
             Comma, And, Or, Question, Colon, Dot, Equal, EqualEqual, Not, NotEqual, LessThan,
-            LessEqual, GreaterThan, GreaterEqual, As, Break, Const, Continue, Else, For, Function,
-            If, Import, In, Let, Loop, Package, Namespace, Null, Return, Var, Void, While,
-            Bool(true), Bool(false),
+            LessEqual, GreaterThan, GreaterEqual, As, Break, Const, Else, Function, If, In, Let,
+            Null, Return, Var, Bool(true), Bool(false),
         ];
 
         assert_equal_tokens(string, &tokens);
