@@ -97,7 +97,6 @@ impl<'a> Parser<'a> {
                         TokenType::LessThan => BinaryOperator::LessThan,
                         TokenType::EqualEqual => BinaryOperator::Equal,
                         TokenType::NotEqual => BinaryOperator::NotEqual,
-                        TokenType::In => BinaryOperator::In,
                         _ => break,
                     };
                     self.consume();
@@ -331,7 +330,7 @@ mod tests {
             "one ? two : three",
             "one && two",
             "one > two || one >= two || one < two || one <= two",
-            "one == two || one != two || one in two",
+            "one == two || one != two",
             "one + two - three / four % five",
             "!one",
             "-one",

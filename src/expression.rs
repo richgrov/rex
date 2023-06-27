@@ -24,7 +24,6 @@ pub(crate) enum BinaryOperator {
     GreaterThan,
     Equal,
     NotEqual,
-    In,
     Add,
     Sub,
     Multiply,

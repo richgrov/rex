@@ -31,17 +31,12 @@ pub(crate) enum TokenType {
     GreaterThan,
     GreaterEqual,
 
-    As,
-    Break,
-    Const,
     Else,
     Function,
     If,
-    In,
     Let,
     Null,
     Return,
-    Var,
 
     Identifier(String),
     Bool(bool),
@@ -348,19 +343,14 @@ impl Tokenizer {
         }
 
         self.token(match identifier.as_str() {
-            "as" => TokenType::As,
-            "break" => TokenType::Break,
-            "const" => TokenType::Const,
             "else" => TokenType::Else,
             "false" => TokenType::Bool(false),
             "function" => TokenType::Function,
             "if" => TokenType::If,
-            "in" => TokenType::In,
             "let" => TokenType::Let,
             "null" => TokenType::Null,
             "return" => TokenType::Return,
             "true" => TokenType::Bool(true),
-            "var" => TokenType::Var,
             _ => TokenType::Identifier(identifier),
         })
     }
@@ -623,15 +613,15 @@ mod tests {
         let string = "
             ( ) ( ) + - * / % , && ||
             ? : . = == ! != < <=
-            > >= as break const else function if in let null return
-            var true false
+            > >= else function if let null return true
+            false
         ";
 
         let tokens = [
             LParen, RParen, LParen, RParen, Plus, Minus, Star, Slash, Percent, Comma, And, Or,
             Question, Colon, Dot, Equal, EqualEqual, Not, NotEqual, LessThan, LessEqual,
-            GreaterThan, GreaterEqual, As, Break, Const, Else, Function, If, In, Let, Null, Return,
-            Var, Bool(true), Bool(false),
+            GreaterThan, GreaterEqual, Else, Function, If, Let, Null, Return, Bool(true),
+            Bool(false),
         ];
 
         assert_equal_tokens(string, &tokens);
