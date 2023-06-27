@@ -265,9 +265,7 @@ impl<'a> Parser<'a> {
                     return self.error("expected closing parenthesis")
                 }
 
-                Ok(Box::new(GroupingExpr {
-                    expr,
-                }))
+                Ok(expr)
             },
 
             TokenType::Dot => {

@@ -80,14 +80,6 @@ impl Expr for CallExpr {
 
 }
 
-pub(crate) struct GroupingExpr {
-    pub expr: Box<dyn Expr>,
-}
-
-impl Expr for GroupingExpr {
-
-}
-
 pub(crate) struct GlobalExpr {
     pub identifier: String,
 }
