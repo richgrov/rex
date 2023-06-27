@@ -11,10 +11,6 @@ const FORM_FEED: char = '\u{000c}';
 pub(crate) enum TokenType {
     LParen,
     RParen,
-    LBracket,
-    RBracket,
-    LBrace,
-    RBrace,
     Plus,
     Minus,
     Star,
@@ -137,10 +133,6 @@ impl Tokenizer {
         Some(match self.consume()? {
             '(' => self.token(TokenType::LParen),
             ')' => self.token(TokenType::RParen),
-            '[' => self.token(TokenType::LBracket),
-            ']' => self.token(TokenType::RBracket),
-            '{' => self.token(TokenType::LBrace),
-            '}' => self.token(TokenType::RBrace),
             '+' => self.token(TokenType::Plus),
             '-' => self.token(TokenType::Minus),
             '*' => self.token(TokenType::Star),
@@ -629,17 +621,17 @@ mod tests {
     #[test]
     fn symbols() {
         let string = "
-            ( ) [ ] ( ) + - * / %
-            , && || ? : . = == ! != <
-            <= > >= as break const else function if in let
-            null return var true false
+            ( ) ( ) + - * / % , && ||
+            ? : . = == ! != < <=
+            > >= as break const else function if in let null return
+            var true false
         ";
 
         let tokens = [
-            LParen, RParen, LBracket, RBracket, LParen, RParen, Plus, Minus, Star, Slash, Percent,
-            Comma, And, Or, Question, Colon, Dot, Equal, EqualEqual, Not, NotEqual, LessThan,
-            LessEqual, GreaterThan, GreaterEqual, As, Break, Const, Else, Function, If, In, Let,
-            Null, Return, Var, Bool(true), Bool(false),
+            LParen, RParen, LParen, RParen, Plus, Minus, Star, Slash, Percent, Comma, And, Or,
+            Question, Colon, Dot, Equal, EqualEqual, Not, NotEqual, LessThan, LessEqual,
+            GreaterThan, GreaterEqual, As, Break, Const, Else, Function, If, In, Let, Null, Return,
+            Var, Bool(true), Bool(false),
         ];
 
         assert_equal_tokens(string, &tokens);

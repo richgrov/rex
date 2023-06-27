@@ -58,14 +58,14 @@ impl Expr for UnaryExpr {
 
 }
 
-pub(crate) struct AccessorExpr {
+pub(crate) struct PropertyExpr {
     pub line: usize,
     pub column: usize,
     pub expr: Box<dyn Expr>,
-    pub accessor: Box<dyn Expr>,
+    pub property: String,
 }
 
-impl Expr for AccessorExpr {
+impl Expr for PropertyExpr {
 
 }
 
@@ -85,22 +85,6 @@ pub(crate) struct GroupingExpr {
 }
 
 impl Expr for GroupingExpr {
-
-}
-
-pub(crate) struct ListExpr {
-    pub expressions: Vec<Box<dyn Expr>>,
-}
-
-impl Expr for ListExpr {
-
-}
-
-pub(crate) struct MapExpr {
-    pub pairs: Vec<(Box<dyn Expr>, Box<dyn Expr>)>,
-}
-
-impl Expr for MapExpr {
 
 }
 

@@ -203,13 +203,11 @@ impl<'a> Parser<'a> {
                     _ => return self.error("expected identifier following '.'"),
                 };
 
-                expr = Box::new(AccessorExpr {
+                expr = Box::new(PropertyExpr {
                     line,
                     column,
                     expr,
-                    accessor: Box::new(ValueExpr {
-                        value: Value::String(ident.to_owned())
-                    }),
+                    property: ident.to_owned(),
                 });
             } else if self.consume_if(TokenType::LParen) {
                 let line = self.line;
@@ -220,21 +218,6 @@ impl<'a> Parser<'a> {
                     column,
                     expr,
                     arguments: self.parse_function_args()?,
-                });
-            } else if self.consume_if(TokenType::LBracket) {
-                let line = self.line;
-                let column = self.column;
-
-                let accessor = self.parse_expr()?;
-                if !self.consume_if(TokenType::RBracket) {
-                    return self.error("expected closing bracket after index access")
-                }
-
-                expr = Box::new(AccessorExpr {
-                    line,
-                    column,
-                    expr,
-                    accessor,
                 });
             } else {
                 break
@@ -287,14 +270,6 @@ impl<'a> Parser<'a> {
                 }))
             },
 
-            TokenType::LBracket => Ok(Box::new(ListExpr {
-                expressions: self.parse_list_literal()?,
-            })),
-            
-            TokenType::LBrace => Ok(Box::new(MapExpr {
-                pairs: self.parse_map_literal()?,
-            })),
-
             TokenType::Dot => {
                 let identifier = match self.peek() {
                     Some(TokenType::Identifier(s)) => s.to_owned(),
@@ -319,61 +294,6 @@ impl<'a> Parser<'a> {
             },
 
         }
-    }
-
-    /// Expects opening `[` to already be consumed
-    fn parse_list_literal(&mut self) -> Result<Vec<BoxedExpr>> {
-        let mut expressions = Vec::new();
-
-        loop {
-            if self.consume_if(TokenType::RBracket) {
-                break
-            }
-            
-            expressions.push(self.parse_expr()?);
-
-            if self.consume_if(TokenType::Comma) {
-                continue
-            }
-
-            if self.consume_if(TokenType::RBracket) {
-                break
-            } else {
-                return self.error("expected closing bracket after list")
-            }
-        }
-
-        Ok(expressions)
-    }
-
-    /// Expects opening `{` to already be consumed
-    fn parse_map_literal(&mut self) -> Result<Vec<(BoxedExpr, Box<dyn Expr>)>> {
-        let mut pairs = Vec::new();
-
-        loop {
-            if self.consume_if(TokenType::RBrace) {
-                break
-            }
-
-            let key = self.parse_expr()?;
-            if !self.consume_if(TokenType::Colon) {
-                return self.error("expected colon after map key")
-            }
-            let value = self.parse_expr()?;
-            pairs.push((key, value));
-
-            if self.consume_if(TokenType::Comma) {
-                continue
-            }
-
-            if self.consume_if(TokenType::RBrace) {
-                break
-            } else {
-                return self.error("expected closing brace after map")
-            }
-        }
-
-        Ok(pairs)
     }
 
     fn peek(&self) -> Option<&TokenType> {
@@ -430,17 +350,9 @@ mod tests {
             "one.two.three",
             "one()",
             "one(two, three, four)",
-            "one[two]",
             ".one.two.three",
             ".one.two.three()",
-            ".one.two.three[four]",
             "(one + two + three)",
-            "[]",
-            "[one, 'two', three]",
-            "[one, 'two', three,]",
-            "{}",
-            "{one: two, 'three': four, five: six}",
-            "{one: two, 'three': four, five: six,}",
             "1",
             "1.0",
             "true && false",
