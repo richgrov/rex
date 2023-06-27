@@ -268,16 +268,6 @@ impl<'a> Parser<'a> {
                 Ok(expr)
             },
 
-            TokenType::Dot => {
-                let identifier = match self.peek() {
-                    Some(TokenType::Identifier(s)) => s.to_owned(),
-                    _ => return self.error("expected identifier for global resolution"),
-                };
-
-                self.consume();
-                Ok(Box::new(GlobalExpr { identifier }))
-            },
-
             TokenType::Identifier(s) => Ok(Box::new(IdentifierExpr {
                 identifier: s.to_owned(),
             })),
@@ -348,8 +338,6 @@ mod tests {
             "one.two.three",
             "one()",
             "one(two, three, four)",
-            ".one.two.three",
-            ".one.two.three()",
             "(one + two + three)",
             "1",
             "1.0",

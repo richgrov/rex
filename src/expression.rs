@@ -80,14 +80,6 @@ impl Expr for CallExpr {
 
 }
 
-pub(crate) struct GlobalExpr {
-    pub identifier: String,
-}
-
-impl Expr for GlobalExpr {
-
-}
-
 pub(crate) struct IdentifierExpr {
     pub identifier: String,
 }
