@@ -137,32 +137,56 @@ impl<'a> Parser<'a> {
 
     fn parse_negative(&mut self) -> Result<BoxedExpr> {
         if self.consume_if(TokenType::Minus) {
-            Ok(Box::new(NegateExpr(self.parse_grouping()?)))
+            Ok(Box::new(NegateExpr(self.parse_primary()?)))
         } else {
-            self.parse_grouping()
+            self.parse_primary()
         }
     }
 
-    fn parse_grouping(&mut self) -> Result<BoxedExpr> {
-        let mut expr = self.parse_primary()?;
+    fn parse_primary(&mut self) -> Result<BoxedExpr> {
+        let token = match self.consume() {
+            Some(t) => t,
+            None => return self.error("expected expression"),
+        };
 
-        loop {
-            if self.consume_if(TokenType::LParen) {
-                let line = self.line;
-                let column = self.column;
+        match token {
+            TokenType::LParen => {
+                let expr = self.parse_expr()?;
+                if !self.consume_if(TokenType::RParen) {
+                    return self.error("expected closing parenthesis")
+                }
 
-                expr = Box::new(CallExpr {
-                    line,
-                    column,
-                    expr,
-                    arguments: self.parse_function_args()?,
-                });
-            } else {
-                break
-            }
+                Ok(expr)
+            },
+
+            TokenType::Identifier(s) => {
+                let identifier = s.to_owned();
+
+                if self.consume_if(TokenType::LParen) {
+                    let line = self.line;
+                    let column = self.column;
+
+                    Ok(Box::new(CallExpr {
+                        line,
+                        column,
+                        function: identifier,
+                        arguments: self.parse_function_args()?,
+                    }))
+                } else {
+                    Ok(Box::new(IdentifierExpr(identifier)))
+                }
+            },
+
+            other => {
+                match other {
+                    TokenType::Number(value) => Ok(Box::new(NumberExpr {
+                        value: *value,
+                    })),
+                    _ => self.error("expected expression"),
+                }
+            },
+
         }
-
-        Ok(expr)
     }
 
     /// Expects opening '(' to already be consumed
@@ -188,38 +212,6 @@ impl<'a> Parser<'a> {
         }
 
         Ok(arguments)
-    }
-
-    fn parse_primary(&mut self) -> Result<BoxedExpr> {
-        let token = match self.consume() {
-            Some(t) => t,
-            None => return self.error("expected expression"),
-        };
-
-        match token {
-            TokenType::LParen => {
-                let expr = self.parse_expr()?;
-                if !self.consume_if(TokenType::RParen) {
-                    return self.error("expected closing parenthesis")
-                }
-
-                Ok(expr)
-            },
-
-            TokenType::Identifier(s) => Ok(Box::new(IdentifierExpr {
-                identifier: s.to_owned(),
-            })),
-
-            other => {
-                match other {
-                    TokenType::Number(value) => Ok(Box::new(NumberExpr {
-                        value: *value,
-                    })),
-                    _ => self.error("expected expression"),
-                }
-            },
-
-        }
     }
 
     fn peek(&self) -> Option<&TokenType> {

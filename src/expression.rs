@@ -43,7 +43,7 @@ impl Expr for NegateExpr {
 pub(crate) struct CallExpr {
     pub line: usize,
     pub column: usize,
-    pub expr: Box<dyn Expr>,
+    pub function: String,
     pub arguments: Vec<Box<dyn Expr>>,
 }
 
@@ -51,9 +51,7 @@ impl Expr for CallExpr {
 
 }
 
-pub(crate) struct IdentifierExpr {
-    pub identifier: String,
-}
+pub(crate) struct IdentifierExpr(pub String);
 
 impl Expr for IdentifierExpr {
 
