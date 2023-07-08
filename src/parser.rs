@@ -29,8 +29,6 @@ struct Parser<'a> {
 impl<'a> Parser<'a> {
     fn parse_expr(&mut self) -> Result<BoxedExpr> {
         let mut expr = self.parse_relative()?;
-        let line = self.line;
-        let column = self.column;
 
         while self.consume_if(TokenType::If) {
             let condition = self.parse_relative()?;
@@ -40,8 +38,6 @@ impl<'a> Parser<'a> {
             let when_false = self.parse_expr()?;
 
             expr = Box::new(ConditionalExpr {
-                line,
-                column,
                 condition,
                 when_true: expr,
                 when_false,
@@ -141,11 +137,7 @@ impl<'a> Parser<'a> {
 
     fn parse_negative(&mut self) -> Result<BoxedExpr> {
         if self.consume_if(TokenType::Minus) {
-            Ok(Box::new(NegateExpr {
-                line: self.line,
-                column: self.column,
-                expr: self.parse_grouping()?,
-            }))
+            Ok(Box::new(NegateExpr(self.parse_grouping()?)))
         } else {
             self.parse_grouping()
         }

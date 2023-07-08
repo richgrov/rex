@@ -3,8 +3,6 @@ pub(crate) trait Expr {}
 pub(crate) type BoxedExpr = Box<dyn Expr>;
 
 pub(crate) struct ConditionalExpr {
-    pub line: usize,
-    pub column: usize,
     pub condition: Box<dyn Expr>,
     pub when_true: Box<dyn Expr>,
     pub when_false: Box<dyn Expr>,
@@ -37,24 +35,9 @@ pub(crate) struct BinaryExpr {
 impl Expr for BinaryExpr {
 }
 
-pub(crate) struct NegateExpr {
-    pub line: usize,
-    pub column: usize,
-    pub expr: Box<dyn Expr>,
-}
+pub(crate) struct NegateExpr(pub Box<dyn Expr>);
 
 impl Expr for NegateExpr {
-}
-
-pub(crate) struct PropertyExpr {
-    pub line: usize,
-    pub column: usize,
-    pub expr: Box<dyn Expr>,
-    pub property: String,
-}
-
-impl Expr for PropertyExpr {
-
 }
 
 pub(crate) struct CallExpr {
