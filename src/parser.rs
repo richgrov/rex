@@ -177,15 +177,9 @@ impl<'a> Parser<'a> {
                 }
             },
 
-            other => {
-                match other {
-                    TokenType::Number(value) => Ok(Box::new(NumberExpr {
-                        value: *value,
-                    })),
-                    _ => self.error("expected expression"),
-                }
-            },
+            TokenType::Number(n) => Ok(Box::new(*n)),
 
+            _ => self.error("expected expression"),
         }
     }
 

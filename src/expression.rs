@@ -57,9 +57,6 @@ impl Expr for IdentifierExpr {
 
 }
 
-pub(crate) struct NumberExpr {
-    pub value: f64,
-}
+impl Expr for f64 {
 
-impl Expr for NumberExpr {
 }
