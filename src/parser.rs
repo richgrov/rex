@@ -137,7 +137,13 @@ impl<'a> Parser<'a> {
 
     fn parse_negative(&mut self) -> Result<BoxedExpr> {
         if self.consume_if(TokenType::Minus) {
-            Ok(Box::new(NegateExpr(self.parse_primary()?)))
+            Ok(Box::new(BinaryExpr {
+                line: self.line,
+                column: self.column,
+                left: Box::new(-1.),
+                operator: BinaryOperator::Multiply,
+                right: self.parse_primary()?,
+            }))
         } else {
             self.parse_primary()
         }

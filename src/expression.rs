@@ -35,11 +35,6 @@ pub(crate) struct BinaryExpr {
 impl Expr for BinaryExpr {
 }
 
-pub(crate) struct NegateExpr(pub Box<dyn Expr>);
-
-impl Expr for NegateExpr {
-}
-
 pub(crate) struct CallExpr {
     pub line: usize,
     pub column: usize,
