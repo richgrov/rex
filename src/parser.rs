@@ -166,9 +166,9 @@ impl<'a> Parser<'a> {
             },
 
             TokenType::Identifier(s) => {
+                let identifier = s.to_owned();
                 let line = self.line;
                 let column = self.column;
-                let identifier = s.to_owned();
 
                 if self.consume_if(TokenType::LParen) {
                     Ok(Box::new(CallExpr {
