@@ -4,7 +4,6 @@ mod error;
 mod expression;
 mod parser;
 mod tokenizer;
-mod value;
 
 fn main() {
     let mut tokenizer = tokenizer::Tokenizer::new("(meme.isCool && meme.isRecent) || user.memePass == 'VIP'");

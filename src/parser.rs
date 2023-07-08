@@ -1,7 +1,6 @@
 use crate::error::{Error, Result};
 use crate::expression::*;
 use crate::tokenizer::{Token, TokenType};
-use crate::value::Value;
 
 pub(crate) fn parse(tokens: &[Token]) -> Result<BoxedExpr> {
     let mut parser = Parser {
@@ -272,11 +271,11 @@ impl<'a> Parser<'a> {
             })),
 
             other => {
-                match Value::try_from(other) {
-                    Ok(value) => Ok(Box::new(ValueExpr {
-                        value,
+                match other {
+                    TokenType::Number(value) => Ok(Box::new(NumberExpr {
+                        value: *value,
                     })),
-                    Err(_) => self.error("expected expression"),
+                    _ => self.error("expected expression"),
                 }
             },
 
@@ -341,8 +340,6 @@ mod tests {
             "1",
             "1.0",
             "true && false",
-            "'test'",
-            "b'test'",
             "null",
         ];
 

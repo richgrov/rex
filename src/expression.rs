@@ -1,5 +1,3 @@
-use crate::value::Value;
-
 pub(crate) trait Expr {}
 
 pub(crate) type BoxedExpr = Box<dyn Expr>;
@@ -87,10 +85,9 @@ impl Expr for IdentifierExpr {
 
 }
 
-pub(crate) struct ValueExpr {
-    pub value: Value,
+pub(crate) struct NumberExpr {
+    pub value: f64,
 }
 
-impl Expr for ValueExpr {
-
+impl Expr for NumberExpr {
 }

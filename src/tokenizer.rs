@@ -1,8 +1,5 @@
 use crate::error::{Error, Result};
 
-const BELL: char = '\u{0007}';
-const BACKSPACE: char = '\u{0008}';
-const VERTICAL_TAB: char = '\u{000b}';
 const FORM_FEED: char = '\u{000c}';
 
 /// All grammatical tokens defined by the CEL spec at
@@ -32,17 +29,10 @@ pub(crate) enum TokenType {
     GreaterEqual,
 
     Else,
-    Function,
     If,
-    Let,
-    Null,
-    Return,
 
     Identifier(String),
-    Bool(bool),
     Number(f64),
-    String(String),
-    Bytes(Vec<u8>),
 }
 
 #[derive(Debug)]
@@ -64,32 +54,6 @@ impl Token {
 
     pub fn column(&self) -> usize {
         self.column
-    }
-}
-
-/// Used to differentiate string literals from byte literals during parsing. For example, '\xFF'
-/// will contain character 'ÿ' encoded as [195, 191] while b'\xFF' will simply contain 0xFF.
-enum StringOrBytes {
-    String(String),
-    Bytes(Vec<u8>),
-}
-
-impl StringOrBytes {
-    fn push_u8(&mut self, u: u8) {
-        match self {
-            StringOrBytes::String(s) => s.push(u as char),
-            StringOrBytes::Bytes(b) => b.push(u),
-        }
-    }
-
-    fn push_char(&mut self, c: char) {
-        match self {
-            StringOrBytes::String(s) => s.push(c),
-            StringOrBytes::Bytes(b) => {
-                let mut slice = [0; 4];
-                b.extend_from_slice(c.encode_utf8(&mut slice).as_bytes());
-            }
-        }
     }
 }
 
@@ -185,10 +149,6 @@ impl Tokenizer {
             c if c.is_ascii_digit() => self.lex_numeric(c),
 
             c => {
-                if let Some(tok) = self.try_lex_string(c) {
-                    return Some(tok)
-                }
-
                 if c.is_ascii_alphabetic() || c == '_' {
                     return Some(self.lex_identifier_or_keyword(c))
                 }
@@ -229,25 +189,6 @@ impl Tokenizer {
             }
         }
         chars
-    }
-
-    fn consume_hex_digits_into_u32(&mut self, num_digits: usize) -> Result<u32> {
-        let mut chars = String::with_capacity(num_digits);
-        for _ in 0..num_digits {
-            match self.consume() {
-                Some(c) if c.is_ascii_hexdigit() => chars.push(c),
-                _ => return self.error(
-                    &format!("expected {} hex digits", num_digits)
-                ),
-            }
-        }
-
-        match u32::from_str_radix(&chars, 16) {
-            Ok(i) => Ok(i),
-            Err(e) => self.error_or_panic_if_debug(
-                &format!("consuming {} hex digits failed: {}", num_digits, e)
-            ),
-        }
     }
 
     /// Reads any of the following integer literals:
@@ -344,201 +285,9 @@ impl Tokenizer {
 
         self.token(match identifier.as_str() {
             "else" => TokenType::Else,
-            "false" => TokenType::Bool(false),
-            "function" => TokenType::Function,
             "if" => TokenType::If,
-            "let" => TokenType::Let,
-            "null" => TokenType::Null,
-            "return" => TokenType::Return,
-            "true" => TokenType::Bool(true),
             _ => TokenType::Identifier(identifier),
         })
-    }
-
-    /// Tries to treat the next sequence characters as a string. If an error occurs *before*
-    /// reading the quotations, the read index will remain unchanged and None is returned. If an
-    /// error occurs *after* reading the quotations, Some(Err) is returned.
-    ///
-    /// Expects the first character of the string to already be consumed.
-    fn try_lex_string(&mut self, initial_char: char) -> Option<Result<Token>> {
-        let mut index = 0;
-        let next_three = [
-            Some(initial_char),
-            self.peek(),
-            self.get_at(self.read_index + 1),
-        ];
-
-        let byte_literal = if next_three[index] == Some('b') || next_three[index] == Some('B') {
-            index += 1;
-            true
-        } else {
-            false
-        };
-
-        let raw_literal = if next_three[index] == Some('r') || next_three[index] == Some('R') {
-            index += 1;
-            true
-        } else {
-            false
-        };
-
-        match next_three[index] {
-            Some(c) if c == '\'' || c == '"' => {
-                self.read_index += index;
-                let mut buffer = if byte_literal {
-                    StringOrBytes::Bytes(Vec::new())
-                } else {
-                    StringOrBytes::String(String::new())
-                };
-
-                Some(match self.read_string_literal(c, raw_literal, &mut buffer) {
-                    Ok(_) => self.token(match buffer {
-                        StringOrBytes::String(s) => TokenType::String(s),
-                        StringOrBytes::Bytes(b) => TokenType::Bytes(b),
-                    }),
-                    Err(e) => Err(e),
-                })
-            },
-            _ => None,
-        }
-    }
-
-    /// Reads a string literal *without* the [b][r] prefix. Expects the *first* opening quote to be
-    /// passed to `quote_type`.
-    fn read_string_literal(
-        &mut self, quote_type: char, ignore_escapes: bool, buffer: &mut StringOrBytes,
-    ) -> Result<()>
-    {
-        debug_assert!(quote_type == '\'' || quote_type == '"');
-
-        let triple_quote = if self.consume_if(|c| c == quote_type).is_some() {
-            if self.consume_if(|c| c == quote_type).is_some() {
-                true
-            } else {
-                return Ok(())
-            }
-        } else {
-            false
-        };
-
-        loop {
-            match self.consume() {
-                Some('\\') => {
-                    if ignore_escapes {
-                        buffer.push_char('\\');
-                        continue
-                    }
-
-                    self.consume_string_escape(buffer)?;
-                },
-                Some('\r') => {
-                    if !triple_quote {
-                        return self.error(
-                            "unexpected end of line while reading string. Insert closing quotation or use \
-                            triple-quotes to span multiple lines"
-                        )
-                    }
-                    buffer.push_char('\r');
-                },
-                Some('\n') => {
-                    if !triple_quote {
-                        return self.error(
-                            "unexpected end of line while reading string. Insert closing quotation or use \
-                            triple-quotes to span multiple lines"
-                        )
-                    }
-                    self.line += 1;
-                    buffer.push_char('\n');
-                },
-                Some(c) => {
-                    if c == quote_type {
-                        if !triple_quote {
-                            break
-                        }
-
-                        if self.peek() == Some(quote_type) && self.get_at(self.read_index + 1) == Some(quote_type) {
-                            self.consume();
-                            self.consume();
-                            break
-                        }
-                    }
-
-                    buffer.push_char(c);
-                },
-                None => return self.error_eof_during("string"),
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Expects the leading `\` character to already be consumed
-    fn consume_string_escape(&mut self, buffer: &mut StringOrBytes) -> Result<()> {
-        match self.consume() {
-            Some('\\') => buffer.push_char('\\'),
-            Some('?') => buffer.push_char('?'),
-            Some('"') => buffer.push_char('"'),
-            Some('\'') => buffer.push_char('\''),
-            Some('`') => buffer.push_char('`'),
-
-            Some('a') => buffer.push_char(BELL),
-            Some('b') => buffer.push_char(BACKSPACE),
-            Some('f') => buffer.push_char(FORM_FEED),
-            Some('n') => buffer.push_char('\n'),
-            Some('r') => buffer.push_char('\r'),
-            Some('t') => buffer.push_char('\t'),
-            Some('v') => buffer.push_char(VERTICAL_TAB),
-
-            Some('u') => {
-                if let StringOrBytes::Bytes(_) = buffer {
-                    return self.error("\\u in strings is not defined for byte literals")
-                }
-
-                let hex_number = self.consume_hex_digits_into_u32(4)?;
-                match char::from_u32(hex_number) {
-                    Some(c) => buffer.push_char(c),
-                    None => return self.error("not a valid unicode code point"),
-                }
-            },
-            Some('U') => {
-                if let StringOrBytes::Bytes(_) = buffer {
-                    return self.error("\\u in strings is not defined for byte literals")
-                }
-
-                let hex_number = self.consume_hex_digits_into_u32(8)?;
-                match char::from_u32(hex_number) {
-                    Some(c) => buffer.push_char(c),
-                    None => return self.error("not a valid unicode code point"),
-                }
-            },
-            Some('x') | Some('X') => {
-                let hex_number = self.consume_hex_digits_into_u32(2)? as u8;
-                buffer.push_u8(hex_number);
-            },
-            Some(other) => {
-                let mut octals = String::with_capacity(3);
-                if !other.is_ascii_digit() {
-                    return self.error("invalid character following string escape")
-                }
-                octals.push(other);
-
-                for _ in 0..2 {
-                    match self.consume() {
-                        Some(c) if c.is_ascii_digit() => {
-                            octals.push(c)
-                        },
-                        _ => return self.error("")
-                    }
-                }
-
-                match u8::from_str_radix(&octals, 8) {
-                    Ok(u) => buffer.push_u8(u),
-                    Err(_) => return self.error("invalid octal"),
-                }
-            },
-            None => return self.error_eof_during("string escape"),
-        }
-        Ok(())
     }
 
     fn peek(&self) -> Option<char> {
@@ -613,15 +362,13 @@ mod tests {
         let string = "
             ( ) ( ) + - * / % , && ||
             ? : . = == ! != < <=
-            > >= else function if let null return true
-            false
+            > >= else if
         ";
 
         let tokens = [
             LParen, RParen, LParen, RParen, Plus, Minus, Star, Slash, Percent, Comma, And, Or,
             Question, Colon, Dot, Equal, EqualEqual, Not, NotEqual, LessThan, LessEqual,
-            GreaterThan, GreaterEqual, Else, Function, If, Let, Null, Return, Bool(true),
-            Bool(false),
+            GreaterThan, GreaterEqual, Else, If,
         ];
 
         assert_equal_tokens(string, &tokens);
@@ -688,67 +435,8 @@ mod tests {
     }
 
     #[test]
-    fn string() {
-        use super::{BELL, BACKSPACE, FORM_FEED, VERTICAL_TAB};
-
-        let string = r#"
-            'hello, world!'
-            "''"
-            '''x''x'''
-            """
-            hello
-            """
-
-            "\u00A7"
-            '\U00020CCF'
-            "ÿ"
-            '\377'
-            "\xFF"
-            r'\u00A7\\'
-            "\"\\\'\`"
-            '\a\b\f\n\r\t\v'
-
-            b'ÿ'
-            b"\377"
-            b'\x21'
-            br"\377"
-            BR"\377"
-        "#;
-
-        let tokens = [
-            String("hello, world!".to_owned()),
-            String("''".to_owned()),
-            String("x''x".to_owned()),
-            String("\n            hello\n            ".to_owned()),
-            
-            String("\u{00A7}".to_owned()),
-            String("\u{20CCF}".to_owned()),
-            String("ÿ".to_owned()),
-            String("ÿ".to_owned()),
-            String("ÿ".to_owned()),
-            String("\\u00A7\\\\".to_owned()),
-            String("\"\\'`".to_owned()),
-            String(format!("{}{}{}\n\r\t{}", BELL, BACKSPACE, FORM_FEED, VERTICAL_TAB)),
-
-            Bytes(vec![195, 191]),
-            Bytes(vec![0xFF]),
-            Bytes(vec![0x21]),
-            Bytes(vec![b'\\', b'3', b'7', b'7']),
-            Bytes(vec![b'\\', b'3', b'7', b'7']),
-        ];
-
-        assert_equal_tokens(string, &tokens);
-
-        assert_error(r#"'""#);
-        assert_error(r#""""'''"#);
-        assert_error("'\n'");
-        assert_error(r#"b'\u00A7'"#);
-        assert_error(r#"b'\U10FFFF'"#);
-    }
-
-    #[test]
     fn token_positions() {
-        let string = "myVar \nconst +\n  0.01 'test'";
+        let string = "myVar \nconst +\n  0.01";
 
         let mut tokenizer = Tokenizer::new(string);
         let mut tokens = Vec::new();
@@ -765,7 +453,6 @@ mod tests {
         assert_pos(&tokens[1], 2, 1);
         assert_pos(&tokens[2], 2, 7);
         assert_pos(&tokens[3], 3, 3);
-        assert_pos(&tokens[4], 3, 8);
     }
 
     fn assert_equal_tokens(s: &str, tokens: &[TokenType]) {
