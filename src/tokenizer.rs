@@ -14,23 +14,13 @@ pub(crate) enum TokenType {
     Slash,
     Percent,
     Comma,
-    And,
-    Or,
-    Question,
-    Colon,
-    Dot,
     Equal,
-    EqualEqual,
-    Not,
-    NotEqual,
     LessThan,
     LessEqual,
     GreaterThan,
     GreaterEqual,
-
-    Else,
     If,
-
+    Else,
     Identifier(String),
     Number(f64),
 }
@@ -98,26 +88,10 @@ impl Tokenizer {
             '/' => self.token(TokenType::Slash),
             '%' => self.token(TokenType::Percent),
             ',' => self.token(TokenType::Comma),
-            '?' => self.token(TokenType::Question),
-            ':' => self.token(TokenType::Colon),
             // https://github.com/google/cel-spec/issues/137
-            '.' => if let Some(_) = self.next_is(|c| c.is_ascii_digit()) {
-                self.lex_numeric('.')
-            } else {
-                self.token(TokenType::Dot)
-            },
+            '.' => self.lex_numeric('.'),
 
-            '=' => if self.consume_if(|c| c == '=').is_some() {
-                self.token(TokenType::EqualEqual)
-            } else {
-                self.token(TokenType::Equal)
-            },
-
-            '!' => if self.consume_if(|c| c == '=').is_some() {
-                self.token(TokenType::NotEqual)
-            } else {
-                self.token(TokenType::Not)
-            },
+            '=' => self.token(TokenType::Equal),
 
             '<' => if self.consume_if(|c| c == '=').is_some() {
                 self.token(TokenType::LessEqual)
@@ -129,21 +103,6 @@ impl Tokenizer {
                 self.token(TokenType::GreaterEqual)
             } else {
                 self.token(TokenType::GreaterThan)
-            },
-
-            '&' => match self.consume() {
-                Some('&') => self.token(TokenType::And),
-                Some(_) => self.error(
-                    "unexpected character following '&'. Only logical AND (&&) operator is supported"
-                ),
-                None => self.error_eof_during("logical AND operator"),
-            },
-            '|' => match self.consume() {
-                Some('|') => self.token(TokenType::Or),
-                Some(_) => self.error(
-                    "unexpected character following '|'. Only logical OR (||) operator is supported"
-                ),
-                None => self.error_eof_during("logical OR operator"),
             },
 
             c if c.is_ascii_digit() => self.lex_numeric(c),
@@ -360,15 +319,13 @@ mod tests {
     #[test]
     fn symbols() {
         let string = "
-            ( ) ( ) + - * / % , && ||
-            ? : . = == ! != < <=
-            > >= else if
+            ( ) ( ) + - * / % , =
+            < <= > >= else if
         ";
 
         let tokens = [
-            LParen, RParen, LParen, RParen, Plus, Minus, Star, Slash, Percent, Comma, And, Or,
-            Question, Colon, Dot, Equal, EqualEqual, Not, NotEqual, LessThan, LessEqual,
-            GreaterThan, GreaterEqual, Else, If,
+            LParen, RParen, LParen, RParen, Plus, Minus, Star, Slash, Percent, Comma, Equal,
+            LessThan, LessEqual, GreaterThan, GreaterEqual, Else, If,
         ];
 
         assert_equal_tokens(string, &tokens);

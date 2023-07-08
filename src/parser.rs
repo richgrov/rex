@@ -28,13 +28,13 @@ struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     fn parse_expr(&mut self) -> Result<BoxedExpr> {
-        let mut expr = self.parse_or()?;
+        let mut expr = self.parse_relative()?;
         let line = self.line;
         let column = self.column;
 
-        while self.consume_if(TokenType::Question) {
-            let when_true = self.parse_or()?;
-            if !self.consume_if(TokenType::Colon) {
+        while self.consume_if(TokenType::If) {
+            let condition = self.parse_relative()?;
+            if !self.consume_if(TokenType::Else) {
                 return self.error("expected colon following terenary")
             }
             let when_false = self.parse_expr()?;
@@ -42,41 +42,9 @@ impl<'a> Parser<'a> {
             expr = Box::new(ConditionalExpr {
                 line,
                 column,
-                condition: expr,
-                when_true,
+                condition,
+                when_true: expr,
                 when_false,
-            });
-        }
-
-        Ok(expr)
-    }
-
-    fn parse_or(&mut self) -> Result<BoxedExpr> {
-        let mut expr = self.parse_and()?;
-
-        while self.consume_if(TokenType::Or) {
-            expr = Box::new(BinaryExpr {
-                line: self.line,
-                column: self.column,
-                left: expr,
-                operator: BinaryOperator::Or,
-                right: self.parse_and()?,
-            });
-        }
-
-        Ok(expr)
-    }
-
-    fn parse_and(&mut self) -> Result<BoxedExpr> {
-        let mut expr = self.parse_relative()?;
-
-        while self.consume_if(TokenType::And) {
-            expr = Box::new(BinaryExpr {
-                line: self.line,
-                column: self.column,
-                left: expr,
-                operator: BinaryOperator::And,
-                right: self.parse_relative()?,
             });
         }
 
@@ -94,8 +62,7 @@ impl<'a> Parser<'a> {
                         TokenType::GreaterEqual => BinaryOperator::GreaterEqual,
                         TokenType::LessEqual => BinaryOperator::LessEqual,
                         TokenType::LessThan => BinaryOperator::LessThan,
-                        TokenType::EqualEqual => BinaryOperator::Equal,
-                        TokenType::NotEqual => BinaryOperator::NotEqual,
+                        TokenType::Equal => BinaryOperator::Equal,
                         _ => break,
                     };
                     self.consume();
@@ -144,7 +111,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_multiplication(&mut self) -> Result<BoxedExpr> {
-        let mut expr = self.parse_unary()?;
+        let mut expr = self.parse_negative()?;
 
         loop {
             match self.peek() {
@@ -162,7 +129,7 @@ impl<'a> Parser<'a> {
                         column: self.column,
                         left: expr,
                         operator,
-                        right: self.parse_unary()?,
+                        right: self.parse_negative()?,
                     });
                 },
                 None => break,
@@ -172,42 +139,23 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn parse_unary(&mut self) -> Result<BoxedExpr> {
-        let operator = match self.peek() {
-            Some(TokenType::Not) => UnaryOperator::Not,
-            Some(TokenType::Minus) => UnaryOperator::Negate,
-            _ => return self.parse_member()
-        };
-        self.consume();
-
-        Ok(Box::new(UnaryExpr {
-            line: self.line,
-            column: self.column,
-            operator,
-            expr: self.parse_member()?,
-        }))
+    fn parse_negative(&mut self) -> Result<BoxedExpr> {
+        if self.consume_if(TokenType::Minus) {
+            Ok(Box::new(NegateExpr {
+                line: self.line,
+                column: self.column,
+                expr: self.parse_grouping()?,
+            }))
+        } else {
+            self.parse_grouping()
+        }
     }
 
-    fn parse_member(&mut self) -> Result<BoxedExpr> {
+    fn parse_grouping(&mut self) -> Result<BoxedExpr> {
         let mut expr = self.parse_primary()?;
 
         loop {
-            if self.consume_if(TokenType::Dot) {
-                let line = self.line;
-                let column = self.column;
-
-                let ident = match self.consume() {
-                    Some(TokenType::Identifier(s)) => s,
-                    _ => return self.error("expected identifier following '.'"),
-                };
-
-                expr = Box::new(PropertyExpr {
-                    line,
-                    column,
-                    expr,
-                    property: ident.to_owned(),
-                });
-            } else if self.consume_if(TokenType::LParen) {
+            if self.consume_if(TokenType::LParen) {
                 let line = self.line;
                 let column = self.column;
 
@@ -326,21 +274,16 @@ mod tests {
     #[test]
     fn grammar() {
         let expressions = [
-            "one ? two : three",
-            "one && two",
-            "one > two || one >= two || one < two || one <= two",
-            "one == two || one != two",
-            "one + two - three / four % five",
-            "!one",
+            "one if two else three",
+            "one > two + one >= two - one < two * one <= two",
+            "one = two / one % two",
             "-one",
-            "one.two.three",
             "one()",
             "one(two, three, four)",
             "(one + two + three)",
             "1",
             "1.0",
-            "true && false",
-            "null",
+            "true % false",
         ];
 
         for string in expressions {

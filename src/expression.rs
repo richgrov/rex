@@ -14,14 +14,11 @@ impl Expr for ConditionalExpr {
 }
 
 pub(crate) enum BinaryOperator {
-    Or,
-    And,
     LessThan,
     LessEqual,
     GreaterEqual,
     GreaterThan,
     Equal,
-    NotEqual,
     Add,
     Sub,
     Multiply,
@@ -40,19 +37,13 @@ pub(crate) struct BinaryExpr {
 impl Expr for BinaryExpr {
 }
 
-pub(crate) enum UnaryOperator {
-    Not, Negate
-}
-
-pub(crate) struct UnaryExpr {
+pub(crate) struct NegateExpr {
     pub line: usize,
     pub column: usize,
-    pub operator: UnaryOperator,
     pub expr: Box<dyn Expr>,
 }
 
-impl Expr for UnaryExpr {
-
+impl Expr for NegateExpr {
 }
 
 pub(crate) struct PropertyExpr {

@@ -6,7 +6,7 @@ mod parser;
 mod tokenizer;
 
 fn main() {
-    let mut tokenizer = tokenizer::Tokenizer::new("(meme.isCool && meme.isRecent) || user.memePass == 'VIP'");
+    let mut tokenizer = tokenizer::Tokenizer::new("all(memeIsCool, memeIsRecent)");
     let mut tokens = Vec::new();
     while let Some(result) = tokenizer.next_token() {
         match result {
