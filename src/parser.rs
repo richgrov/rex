@@ -160,12 +160,11 @@ impl<'a> Parser<'a> {
             },
 
             TokenType::Identifier(s) => {
+                let line = self.line;
+                let column = self.column;
                 let identifier = s.to_owned();
 
                 if self.consume_if(TokenType::LParen) {
-                    let line = self.line;
-                    let column = self.column;
-
                     Ok(Box::new(CallExpr {
                         line,
                         column,
@@ -173,7 +172,11 @@ impl<'a> Parser<'a> {
                         arguments: self.parse_function_args()?,
                     }))
                 } else {
-                    Ok(Box::new(IdentifierExpr(identifier)))
+                    Ok(Box::new(IdentifierExpr {
+                        line,
+                        column,
+                        identifier
+                    }))
                 }
             },
 

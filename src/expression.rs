@@ -51,7 +51,11 @@ impl Expr for CallExpr {
 
 }
 
-pub(crate) struct IdentifierExpr(pub String);
+pub(crate) struct IdentifierExpr {
+    pub line: usize,
+    pub column: usize,
+    pub identifier: String,
+}
 
 impl Expr for IdentifierExpr {
 
