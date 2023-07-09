@@ -386,7 +386,7 @@ mod tests {
     fn token_positions() {
         let string = "myVar \nconst +\n  0.01";
 
-        let mut tokens = tokenize(string).unwrap();
+        let tokens = tokenize(string).unwrap();
 
         fn assert_pos(token: &Token, line: usize, column: usize) {
             assert!(token.line() == line);
@@ -400,7 +400,7 @@ mod tests {
     }
 
     fn assert_equal_tokens(s: &str, tokens: &[TokenType]) {
-        let mut actual = tokenize(s).unwrap();
+        let actual = tokenize(s).unwrap();
         assert_eq!(actual.len(), tokens.len());
 
         for (i, tok) in tokens.iter().enumerate() {

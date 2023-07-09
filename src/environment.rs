@@ -37,7 +37,7 @@ impl Environment {
     pub(crate) fn function_info(&self, name: &str) -> Option<(usize, &Function)> {
         self.functions.iter()
             .enumerate()
-            .find(|(index, (s, func))| s == name)
+            .find(|(_index, (s, _func))| s == name)
             .map(|(index, (_, func))| (index, func))
     }
 }
