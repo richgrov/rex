@@ -45,8 +45,26 @@ impl Token {
     }
 }
 
-/// An [`Iterator`] that converts a string of characters into [`Token`]s.
-pub(crate) struct Tokenizer {
+pub(crate) fn tokenize(text: &str) -> Result<Vec<Token>> {
+    let mut tokenizer = Tokenizer {
+        text: text.chars().collect(),
+        read_index: 0,
+        line: 1,
+        // Consuming the first character will set the column to 1
+        column: 0,
+
+        token_start_line: 1,
+        token_start_column: 0,
+    };
+
+    let mut tokens = Vec::new();
+    while let Some(result) = tokenizer.next_token() {
+        tokens.push(result?);
+    }
+    Ok(tokens)
+}
+
+struct Tokenizer {
     text: Vec<char>,
     read_index: usize,
 
@@ -58,20 +76,7 @@ pub(crate) struct Tokenizer {
 }
 
 impl Tokenizer {
-    pub fn new(text: &str) -> Tokenizer {
-        Tokenizer {
-            text: text.chars().collect(),
-            read_index: 0,
-            line: 1,
-            // Consuming the first character will set the column to 1
-            column: 0,
-
-            token_start_line: 1,
-            token_start_column: 0,
-        }
-    }
-
-    pub fn next_token(&mut self) -> Option<Result<Token>> {
+    fn next_token(&mut self) -> Option<Result<Token>> {
         self.consume_whitespace();
 
         self.token_start_line = self.line;
@@ -300,7 +305,7 @@ impl Tokenizer {
 
 #[cfg(test)]
 mod tests {
-    use super::{Tokenizer, Token, TokenType};
+    use super::{tokenize, Token, TokenType};
     use TokenType::*;
 
     #[test]
@@ -336,8 +341,7 @@ mod tests {
 
         assert_equal_tokens(string, &tokens);
 
-        let mut tokenizer = Tokenizer::new("1dentifier");
-        assert_ne!(*tokenizer.next_token().unwrap().unwrap().ty(), Identifier("1dentifier".to_string()));
+        assert_ne!(*tokenize("1dentifier").unwrap()[0].ty(), Identifier("1dentifier".to_string()));
     }
 
     #[test]
@@ -382,11 +386,7 @@ mod tests {
     fn token_positions() {
         let string = "myVar \nconst +\n  0.01";
 
-        let mut tokenizer = Tokenizer::new(string);
-        let mut tokens = Vec::new();
-        while let Some(tok) = tokenizer.next_token() {
-            tokens.push(tok.unwrap());
-        }
+        let mut tokens = tokenize(string).unwrap();
 
         fn assert_pos(token: &Token, line: usize, column: usize) {
             assert!(token.line() == line);
@@ -400,19 +400,15 @@ mod tests {
     }
 
     fn assert_equal_tokens(s: &str, tokens: &[TokenType]) {
-        let mut tokenizer = Tokenizer::new(s);
-        for (i, tok1) in tokens.iter().enumerate() {
-            let tok2 = tokenizer.next_token().unwrap().unwrap();
-            assert_eq!(*tok1, *tok2.ty(), "entry number {}", i + 1);
-        }
+        let mut actual = tokenize(s).unwrap();
+        assert_eq!(actual.len(), tokens.len());
 
-        match tokenizer.next_token() {
-            Some(t) => panic!("extra token {:?}", t),
-            None => {},
+        for (i, tok) in tokens.iter().enumerate() {
+            assert_eq!(*tok, *actual[i].ty(), "entry number {}", i + 1);
         }
     }
 
     fn assert_error(s: &str) {
-        assert!(Tokenizer::new(s).next_token().unwrap().is_err(), "src: {}", s);
+        assert!(tokenize(s).is_err(), "src: {}", s);
     }
 }

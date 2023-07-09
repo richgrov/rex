@@ -18,17 +18,13 @@ fn all(a: f64, b: f64) -> f64 {
 }
 
 fn main() {
-    let mut tokenizer = tokenizer::Tokenizer::new("all(memeIsCool, memeIsRecent)");
-    let mut tokens = Vec::new();
-    while let Some(result) = tokenizer.next_token() {
-        match result {
-            Ok(t) => tokens.push(t),
-            Err(e) => {
-                eprintln!("error: {:?}", e);
-                return
-            },
-        }
-    }
+    let tokens = match tokenizer::tokenize("all(memeIsCool, memeIsRecent)") {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("error: {:?}", e);
+            return
+        },
+    };
 
     let expression = match parser::parse(&tokens) {
         Ok(ex) => ex,

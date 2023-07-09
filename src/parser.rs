@@ -248,7 +248,7 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tokenizer::Tokenizer;
+    use crate::tokenizer;
 
     #[test]
     fn grammar() {
@@ -266,11 +266,7 @@ mod tests {
         ];
 
         for string in expressions {
-            let mut tokens = Vec::new();
-            let mut tokenizer = Tokenizer::new(string);
-            while let Some(result) = tokenizer.next_token() {
-                tokens.push(result.unwrap());
-            }
+            let tokens = tokenizer::tokenize(string).unwrap();
 
             match super::parse(&tokens) {
                 Err(e) => panic!("failed to parse \"{}\" with error \"{}\"", string, e),
