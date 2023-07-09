@@ -253,13 +253,6 @@ impl Tokenizer {
         self.get_at(self.read_index)
     }
     
-    fn next_is<F: FnOnce(char) -> bool>(&self, f: F) -> Option<char> {
-        match self.peek() {
-            Some(c) if f(c) => Some(c),
-            _ => None,
-        }
-    }
-
     fn get_at(&self, index: usize) -> Option<char> {
         self.text.get(index).copied()
     }
@@ -304,10 +297,6 @@ impl Tokenizer {
         } else {
             self.error(message)
         }
-    }
-
-    fn error_eof_during<T>(&self, while_reading: &str) -> Result<T> {
-        self.error(&format!("end of file while reading {}", while_reading))
     }
 }
 
