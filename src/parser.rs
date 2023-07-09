@@ -64,8 +64,6 @@ impl<'a> Parser<'a> {
                     self.consume();
 
                     expr = Box::new(BinaryExpr {
-                        line: self.line,
-                        column: self.column,
                         left: expr,
                         operator,
                         right: self.parse_addition()?,
@@ -92,8 +90,6 @@ impl<'a> Parser<'a> {
                     self.consume();
 
                     expr = Box::new(BinaryExpr {
-                        line: self.line,
-                        column: self.column,
                         left: expr,
                         operator,
                         right: self.parse_multiplication()?,
@@ -121,8 +117,6 @@ impl<'a> Parser<'a> {
                     self.consume();
 
                     expr = Box::new(BinaryExpr {
-                        line: self.line,
-                        column: self.column,
                         left: expr,
                         operator,
                         right: self.parse_negative()?,
@@ -138,8 +132,6 @@ impl<'a> Parser<'a> {
     fn parse_negative(&mut self) -> Result<BoxedExpr> {
         if self.consume_if(TokenType::Minus) {
             Ok(Box::new(BinaryExpr {
-                line: self.line,
-                column: self.column,
                 left: Box::new(-1.),
                 operator: BinaryOperator::Multiply,
                 right: self.parse_primary()?,

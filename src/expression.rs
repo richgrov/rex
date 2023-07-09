@@ -25,8 +25,6 @@ pub(crate) enum BinaryOperator {
 }
 
 pub(crate) struct BinaryExpr {
-    pub line: usize,
-    pub column: usize,
     pub left: Box<dyn Expr>,
     pub operator: BinaryOperator,
     pub right: Box<dyn Expr>,
