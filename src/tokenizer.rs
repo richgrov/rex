@@ -2,8 +2,6 @@ use crate::error::{Error, Result};
 
 const FORM_FEED: char = '\u{000c}';
 
-/// All grammatical tokens defined by the CEL spec at
-/// https://github.com/google/cel-spec/blob/master/doc/langdef.md#syntax
 #[derive(Debug, PartialEq)]
 pub(crate) enum TokenType {
     LParen,
