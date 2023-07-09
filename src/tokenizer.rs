@@ -2,7 +2,7 @@ use crate::error::{Error, Result};
 
 const FORM_FEED: char = '\u{000c}';
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub(crate) enum TokenType {
     LParen,
     RParen,
@@ -32,6 +32,11 @@ pub(crate) struct Token {
 }
 
 impl Token {
+    #[cfg(test)]
+    pub fn new(ty: TokenType, line: usize, column: usize) -> Token {
+        Token { ty, line, column }
+    }
+
     pub fn ty(&self) -> &TokenType {
         &self.ty
     }

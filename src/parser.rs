@@ -248,30 +248,140 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tokenizer;
+    use crate::tokenizer::{TokenType, Token};
+    use crate::expression::{ConditionalExpr, BinaryExpr, BinaryOperator, IdentifierExpr, Expr, CallExpr};
 
     #[test]
-    fn grammar() {
-        let expressions = [
-            "one if two else three",
-            "one > two + one >= two - one < two * one <= two",
-            "one = two / one % two",
-            "-one",
-            "one()",
-            "one(two, three, four)",
-            "(one + two + three)",
-            "1",
-            "1.0",
-            "true % false",
+    fn conditional() {
+        use TokenType::*;
+        // one if 1 = 2 else three
+        let tokens = &vec![
+            Identifier("one".to_owned()), If, Number(1.), Equal, Number(2.), Else,
+            Identifier("three".to_owned()),
         ];
 
-        for string in expressions {
-            let tokens = tokenizer::tokenize(string).unwrap();
+        assert_equal_ast(&tokens, &ConditionalExpr {
+            condition: Box::new(BinaryExpr {
+                left: Box::new(1.),
+                operator: BinaryOperator::Equal,
+                right: Box::new(2.),
+            }),
+            when_true: Box::new(IdentifierExpr {
+                line: 0,
+                column: 0,
+                identifier: "one".to_owned(),
+            }),
+            when_false: Box::new(IdentifierExpr {
+                line: 0,
+                column: 0,
+                identifier: "three".to_owned(),
+            }),
+        });
+    }
 
-            match super::parse(&tokens) {
-                Err(e) => panic!("failed to parse \"{}\" with error \"{}\"", string, e),
-                _ => {},
-            }
-        }
+    #[test]
+    fn math() {
+        use TokenType::*;
+        // -2 % 1 + 3 * (4 - 5) / 6
+        let tokens = &vec![
+            Minus, Number(2.), Percent, Number(1.), Plus, Number(3.), Star, LParen, Number(4.), Minus,
+            Number(5.), RParen, Slash, Number(6.),
+        ];
+
+        assert_equal_ast(&tokens, &BinaryExpr {
+            left: Box::new(BinaryExpr {
+                left: Box::new(BinaryExpr {
+                    left: Box::new(-1.),
+                    operator: BinaryOperator::Multiply,
+                    right: Box::new(2.),
+                }),
+                operator: BinaryOperator::Remainder,
+                right: Box::new(1.),
+            }),
+            operator: BinaryOperator::Add,
+            right: Box::new(BinaryExpr {
+                left: Box::new(BinaryExpr {
+                    left: Box::new(3.),
+                    operator: BinaryOperator::Multiply,
+                    right: Box::new(BinaryExpr {
+                        left: Box::new(4.),
+                        operator: BinaryOperator::Sub,
+                        right: Box::new(5.),
+                    }),
+                }),
+                operator: BinaryOperator::Divide,
+                right: Box::new(6.),
+            }),
+        });
+    }
+
+    #[test]
+    fn comparison() {
+        use TokenType::*;
+        // 1 = 2 < 3 <= 4 >= 5 < 6
+        let tokens = &vec![
+            Number(1.), Equal, Number(2.), LessThan, Number(3.), LessEqual, Number(4.),
+            GreaterEqual, Number(5.), LessThan, Number(6.),
+        ];
+
+        assert_equal_ast(&tokens, &BinaryExpr {
+            left: Box::new(BinaryExpr {
+                left: Box::new(BinaryExpr {
+                    left: Box::new(BinaryExpr {
+                        left: Box::new(BinaryExpr {
+                            left: Box::new(1.),
+                            operator: BinaryOperator::Equal,
+                            right: Box::new(2.),
+                        }),
+                        operator: BinaryOperator::LessThan,
+                        right: Box::new(3.),
+                    }),
+                    operator: BinaryOperator::LessEqual,
+                    right: Box::new(4.),
+                }),
+                operator: BinaryOperator::GreaterEqual,
+                right: Box::new(5.),
+            }),
+            operator: BinaryOperator::LessThan,
+            right: Box::new(6.)
+        });
+    }
+
+    #[test]
+    fn function() {
+        use TokenType::*;
+        // all(1, true, 2 + 3)
+        let tokens = &vec![
+            Identifier("all".to_owned()), LParen, Number(1.), Comma,
+            TokenType::Identifier("true".to_owned()), Comma, Number(2.), Plus, Number(3.), RParen,
+        ];
+
+        assert_equal_ast(&tokens, &CallExpr {
+            line: 0,
+            column: 0,
+            function: "all".to_owned(),
+            arguments: vec![
+                Box::new(1.),
+                Box::new(IdentifierExpr {
+                    line: 0,
+                    column: 0,
+                    identifier: "true".to_owned(),
+                }),
+                Box::new(BinaryExpr {
+                    left: Box::new(2.),
+                    operator: BinaryOperator::Add,
+                    right: Box::new(3.),
+                }),
+            ],
+        });
+    }
+
+    fn assert_equal_ast(token_types: &[TokenType], ast: &dyn Expr) {
+        let tokens: Vec<Token> = token_types.iter()
+            .map(|t| Token::new(t.clone(), 0, 0))
+            .collect();
+
+        let actual = super::parse(&tokens).unwrap();
+        assert!(actual.values_equal(ast), "actual = {:?}", actual);
     }
 }

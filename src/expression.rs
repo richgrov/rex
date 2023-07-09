@@ -1,3 +1,6 @@
+use std::any::Any;
+use std::ops::Deref;
+
 use crate::environment::{Environment, Function};
 use crate::error::Error;
 
@@ -21,12 +24,16 @@ pub(crate) enum ByteCode {
     Jump{ offset: usize},
 }
 
-pub(crate) trait Expr {
+pub(crate) trait Expr: core::fmt::Debug {
     fn emit_bytecode(&self, env: &Environment, bc: &mut Vec<ByteCode>) -> Result<(), Error>;
+    fn as_any(&self) -> &dyn Any;
+    /// Does not compare buffer positions
+    fn values_equal(&self, other: &dyn Expr) -> bool;
 }
 
 pub(crate) type BoxedExpr = Box<dyn Expr>;
 
+#[derive(Debug)]
 pub(crate) struct ConditionalExpr {
     pub condition: Box<dyn Expr>,
     pub when_true: Box<dyn Expr>,
@@ -57,8 +64,23 @@ impl Expr for ConditionalExpr {
         bc.extend_from_slice(&false_path);
         Ok(())
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn values_equal(&self, other: &dyn Expr) -> bool {
+        other.as_any()
+            .downcast_ref::<ConditionalExpr>()
+            .map_or(false, |expr|
+                self.condition.values_equal(expr.condition.deref()) &&
+                self.when_true.values_equal(expr.when_true.deref()) &&
+                self.when_false.values_equal(expr.when_false.deref())
+            )
+    }
 }
 
+#[derive(Debug, PartialEq)]
 pub(crate) enum BinaryOperator {
     LessThan,
     LessEqual,
@@ -72,6 +94,7 @@ pub(crate) enum BinaryOperator {
     Remainder,
 }
 
+#[derive(Debug)]
 pub(crate) struct BinaryExpr {
     pub left: Box<dyn Expr>,
     pub operator: BinaryOperator,
@@ -96,8 +119,23 @@ impl Expr for BinaryExpr {
         });
         Ok(())
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn values_equal(&self, other: &dyn Expr) -> bool {
+        other.as_any()
+            .downcast_ref::<BinaryExpr>()
+            .map_or(false, |expr|
+                self.left.values_equal(expr.left.deref()) &&
+                self.operator == expr.operator &&
+                self.right.values_equal(expr.right.deref())
+            )
+    }
 }
 
+#[derive(Debug)]
 pub(crate) struct CallExpr {
     pub line: usize,
     pub column: usize,
@@ -138,8 +176,31 @@ impl Expr for CallExpr {
         bc.push(ByteCode::Call{func_index: index, line: self.line, column: self.column});
         Ok(())
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn values_equal(&self, other: &dyn Expr) -> bool {
+        other.as_any()
+            .downcast_ref::<CallExpr>()
+            .map_or(false, |expr| {
+                if self.arguments.len() != expr.arguments.len() {
+                    return false
+                }
+
+                for i in 0..self.arguments.len() {
+                    if !self.arguments[i].values_equal(expr.arguments[i].deref()) {
+                        return false
+                    }
+                }
+
+                self.function == expr.function
+            })
+    }
 }
 
+#[derive(Debug, PartialEq)]
 pub(crate) struct IdentifierExpr {
     pub line: usize,
     pub column: usize,
@@ -156,11 +217,31 @@ impl Expr for IdentifierExpr {
         bc.push(ByteCode::LoadItem{ index });
         Ok(())
     }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn values_equal(&self, other: &dyn Expr) -> bool {
+        other.as_any()
+            .downcast_ref::<IdentifierExpr>()
+            .map_or(false, |expr| expr.identifier == self.identifier)
+    }
 }
 
 impl Expr for f64 {
     fn emit_bytecode(&self, _: &Environment, bc: &mut Vec<ByteCode>) -> Result<(), Error> {
         bc.push(ByteCode::LoadConst(*self));
         Ok(())
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn values_equal(&self, other: &dyn Expr) -> bool {
+        other.as_any()
+            .downcast_ref::<f64>()
+            .map_or(false, |val| *val == *self)
     }
 }
