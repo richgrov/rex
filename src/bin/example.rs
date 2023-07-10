@@ -1,4 +1,4 @@
-use rex::Function;
+use rex::{Function, Environment};
 
 fn all(a: f64, b: f64) -> f64 {
     if a == 1. && b == 1. {
@@ -13,11 +13,25 @@ fn main() {
     env.add_function("and", Function::Double(all));
 
     for line in std::io::stdin().lines() {
-        let expr = rex::compile(&line.unwrap(), &env).unwrap();
-
-        match expr.eval(&[1.0, 2.0]) {
-            Ok(val) => println!("= {}", val),
-            Err(e) => println!("error: {}", e,),
+        if let Err(e) = eval(&line.unwrap(), &env, &[1.0, 2.0]) {
+            println!("error: {}", e,);
         }
     }
+}
+
+fn eval(mut src: &str, env: &Environment, input: &[f64]) -> Result<(), rex::Error> {
+    let disassemble = if src.ends_with("#disassemble") {
+        src = src.trim_end_matches("#disassemble");
+        true
+    } else {
+        false
+    };
+
+    let expr = rex::compile(&src, &env).unwrap();
+    if disassemble {
+        println!("{}", expr.code_dump());
+    }
+
+    println!("= {}", expr.eval(input)?);
+    Ok(())
 }

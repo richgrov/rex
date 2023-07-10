@@ -24,6 +24,31 @@ pub(crate) enum ByteCode {
     Jump{ offset: usize},
 }
 
+impl std::fmt::Display for ByteCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ByteCode::LoadConst(val) => write!(f, "load {}", val),
+            ByteCode::LoadItem { index } => write!(f, "load [{}]", index),
+            ByteCode::Call { func_index, line, column } =>
+                write!(f, "call {} @ {}:{}", func_index, line, column),
+            ByteCode::CallVararg { func_index, num_args, line, column } =>
+                write!(f, "call, {}, {} @ {}:{}", func_index, num_args, line, column),
+            ByteCode::LessThan => write!(f, "lessThan"),
+            ByteCode::LessEqual => write!(f, "lessEqual"),
+            ByteCode::GreaterEqual => write!(f, "greaterEqual"),
+            ByteCode::GreaterThan => write!(f, "greaterThan"),
+            ByteCode::Equal => write!(f, "eq"),
+            ByteCode::Add => write!(f, "add"),
+            ByteCode::Sub => write!(f, "sub"),
+            ByteCode::Multiply => write!(f, "mult"),
+            ByteCode::Divide => write!(f, "div"),
+            ByteCode::Remainder => write!(f, "remainder"),
+            ByteCode::JumpIfZero { offset } => write!(f, "jz {}", offset),
+            ByteCode::Jump { offset } => write!(f, "jmp {}", offset),
+        }
+    }
+}
+
 pub(crate) trait Expr: core::fmt::Debug {
     fn emit_bytecode(&self, env: &Environment, bc: &mut Vec<ByteCode>) -> Result<(), Error>;
     fn as_any(&self) -> &dyn Any;
