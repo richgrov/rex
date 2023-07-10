@@ -1,15 +1,14 @@
 use std::any::Any;
 use std::ops::Deref;
 
-use crate::environment::{Environment, Function};
+use crate::environment::Environment;
 use crate::error::Error;
 
 #[derive(Clone)]
 pub(crate) enum ByteCode {
     LoadConst(f64),
     LoadItem{ index: usize },
-    Call{ func_index: usize, line: usize, column: usize },
-    CallVararg{ func_index: usize, num_args: usize, line: usize, column: usize },
+    Call{ func_index: usize, num_args: usize, line: usize, column: usize },
     LessThan,
     LessEqual,
     GreaterEqual,
@@ -29,9 +28,7 @@ impl std::fmt::Display for ByteCode {
         match self {
             ByteCode::LoadConst(val) => write!(f, "load {}", val),
             ByteCode::LoadItem { index } => write!(f, "load [{}]", index),
-            ByteCode::Call { func_index, line, column } =>
-                write!(f, "call {} @ {}:{}", func_index, line, column),
-            ByteCode::CallVararg { func_index, num_args, line, column } =>
+            ByteCode::Call { func_index, num_args, line, column } =>
                 write!(f, "call, {}, {} @ {}:{}", func_index, num_args, line, column),
             ByteCode::LessThan => write!(f, "lessThan"),
             ByteCode::LessEqual => write!(f, "lessEqual"),
@@ -174,31 +171,17 @@ impl Expr for CallExpr {
             self.arguments[i].emit_bytecode(env, bc)?;
         }
 
-        let (index, func) = match env.function_info(&self.function) {
+        let (index, _func) = match env.function_info(&self.function) {
             Some(i) => i,
             None => return Err(Error::new(self.line, self.column, "function not found")),
         };
 
-        let expected_args = match func {
-            Function::Single(_) => 1,
-            Function::Double(_) => 2,
-            Function::Triple(_) => 3,
-            Function::Vararg(_) => {
-                bc.push(ByteCode::CallVararg{
-                    func_index: index,
-                    num_args: self.arguments.len(),
-                    line: self.line,
-                    column: self.column,
-                });
-                return Ok(())
-            },
-        };
-
-        if expected_args != 0 && self.arguments.len() != expected_args {
-            return Err(Error::new(self.line, self.column, "invalid num args"))
-        }
-
-        bc.push(ByteCode::Call{func_index: index, line: self.line, column: self.column});
+        bc.push(ByteCode::Call{
+            func_index: index,
+            num_args: self.arguments.len(),
+            line: self.line,
+            column: self.column,
+        });
         Ok(())
     }
 

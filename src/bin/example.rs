@@ -1,16 +1,20 @@
-use rex::{Function, Environment};
+use rex::Environment;
 
-fn all(a: f64, b: f64) -> f64 {
-    if a == 1. && b == 1. {
-        1.
-    } else {
-        0.
+fn all(args: &[f64]) -> f64 {
+    for arg in args {
+        if *arg == 0. {
+            return 0.
+        }
     }
+
+    1.
 }
 
 fn main() {
-    let mut env = rex::Environment::new(&["one", "two"]);
-    env.add_function("and", Function::Double(all));
+    let env = rex::Environment {
+        locals: vec!["one".to_owned(), "two".to_owned()],
+        functions: vec![("all".to_owned(), all)],
+    };
 
     for line in std::io::stdin().lines() {
         if let Err(e) = eval(&line.unwrap(), &env, &[1.0, 2.0]) {

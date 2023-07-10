@@ -1,4 +1,4 @@
-use crate::environment::{Environment, Function};
+use crate::environment::Environment;
 use crate::error::Error;
 use crate::expression::ByteCode;
 
@@ -23,38 +23,18 @@ pub(crate) fn eval(bc: &[ByteCode], input: &[f64], env: &Environment) -> Result<
 
                 stack.push(val);
             },
-            Call { func_index, line, column } => {
+            Call { func_index, num_args, line, column } => {
                 let function = match env.get_function(*func_index) {
                     Some(f) => f,
                     None => return Err(Error::new(0, 0, "VM Error")),
                 };
 
-                let result = match function {
-                    Function::Single(func) => func(stack.pop()?),
-                    Function::Double(func) => func(stack.pop()?, stack.pop()?),
-                    Function::Triple(func) => func(stack.pop()?, stack.pop()?, stack.pop()?),
-                    Function::Vararg(_) => return Err(Error::new(0, 0, "VM Error")),
-                };
-
-                if result.is_nan() {
-                    return Err(Error::new(*line, *column, "function returned Nan"))
-                }
-
-                stack.push(result);
-            },
-            CallVararg { func_index, num_args, line, column } => {
-                let function = match env.get_function(*func_index) {
-                    Some(f) => f,
-                    None => return Err(Error::new(0, 0, "VM Error")),
-                };
-
-                let Function::Vararg(func) = function else { return Err(Error::new(0, 0, "VM Error")) };
                 let mut args = Vec::with_capacity(*num_args);
                 for _ in 0..*num_args {
                     args.push(stack.pop()?);
                 }
 
-                let result = func(&args);
+                let result = function(&args);
                 if result.is_nan() {
                     return Err(Error::new(*line, *column, "function returned Nan"))
                 }
