@@ -14,6 +14,7 @@ fn main() {
     let env = rex::Environment {
         locals: vec!["one".to_owned(), "two".to_owned()],
         functions: vec![("all".to_owned(), all)],
+        optimization_level: rex::OptimizationLevel::Basic,
     };
 
     for line in std::io::stdin().lines() {

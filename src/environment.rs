@@ -1,8 +1,15 @@
 pub type Function = fn(&[f64]) -> f64;
 
+#[derive(PartialEq, PartialOrd)]
+pub enum OptimizationLevel {
+    None = 0,
+    Basic = 1,
+}
+
 pub struct Environment {
     pub locals: Vec<String>,
     pub functions: Vec<(String, Function)>,
+    pub optimization_level: OptimizationLevel,
 }
 
 impl Environment {

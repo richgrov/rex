@@ -48,6 +48,9 @@ impl std::fmt::Display for ByteCode {
 
 pub(crate) trait Expr: core::fmt::Debug {
     fn emit_bytecode(&self, env: &Environment, bc: &mut Vec<ByteCode>) -> Result<(), Error>;
+
+    fn fold(&mut self, env: &Environment) -> Option<Box<dyn Expr>>;
+
     fn as_any(&self) -> &dyn Any;
     /// Does not compare buffer positions
     fn values_equal(&self, other: &dyn Expr) -> bool;
@@ -85,6 +88,18 @@ impl Expr for ConditionalExpr {
         bc.extend_from_slice(&true_path);
         bc.extend_from_slice(&false_path);
         Ok(())
+    }
+
+    fn fold(&mut self, env: &Environment) -> Option<Box<dyn Expr>> {
+        if let Some(cond) = self.condition.fold(env) {
+            self.condition = cond;
+        }
+
+        match self.condition.as_any().downcast_ref::<f64>()? {
+            val if val.is_nan() => Some(Box::new(f64::NAN)),
+            val if *val == 0.0 => self.when_false.fold(env),
+            _ => self.when_true.fold(env),
+        }
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -128,7 +143,7 @@ impl Expr for BinaryExpr {
         self.right.emit_bytecode(env, bc)?;
         self.left.emit_bytecode(env, bc)?;
         bc.push(match self.operator {
-            BinaryOperator::LessThan => ByteCode::LessThan, 
+            BinaryOperator::LessThan => ByteCode::LessThan,
             BinaryOperator::LessEqual => ByteCode::LessEqual,
             BinaryOperator::GreaterEqual => ByteCode::GreaterEqual,
             BinaryOperator::GreaterThan => ByteCode::GreaterThan,
@@ -140,6 +155,41 @@ impl Expr for BinaryExpr {
             BinaryOperator::Remainder => ByteCode::Remainder,
         });
         Ok(())
+    }
+
+    fn fold(&mut self, env: &Environment) -> Option<Box<dyn Expr>> {
+        if let Some(left) = self.left.fold(env) {
+            self.left = left;
+        }
+
+        if let Some(right) = self.right.fold(env) {
+            self.right = right;
+        }
+
+        let a = self.left.as_any().downcast_ref::<f64>()?;
+        let b = self.right.as_any().downcast_ref::<f64>()?;
+        if a.is_nan() || b.is_nan() {
+            return Some(Box::new(f64::NAN))
+        }
+
+        let result = match self.operator {
+            BinaryOperator::LessThan => (a < b) as i32 as f64, 
+            BinaryOperator::LessEqual => (a <= b) as i32 as f64,
+            BinaryOperator::GreaterEqual => (a >= b) as i32 as f64,
+            BinaryOperator::GreaterThan => (a > b) as i32 as f64,
+            BinaryOperator::Equal => (a == b) as i32 as f64,
+            BinaryOperator::Add => a + b,
+            BinaryOperator::Sub => a - b,
+            BinaryOperator::Multiply => a * b,
+            BinaryOperator::Divide => if *b == 0.0 {
+                f64::NAN
+            } else {
+                a / b
+            },
+            BinaryOperator::Remainder => a % b,
+        };
+
+        Some(Box::new(result))
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -185,6 +235,30 @@ impl Expr for CallExpr {
         Ok(())
     }
 
+    fn fold(&mut self, env: &Environment) -> Option<Box<dyn Expr>> {
+        for i in 0..self.arguments.len() {
+            if let Some(arg) = self.arguments[i].fold(env) {
+                self.arguments[i] = arg;
+            }
+        }
+
+        let mut args = Vec::with_capacity(self.arguments.len());
+        for arg in &self.arguments {
+            match arg.as_any().downcast_ref::<f64>() {
+                Some(val) if val.is_nan() => return Some(Box::new(*val)),
+                Some(val) => args.push(*val),
+                None => return None,
+            }
+        }
+
+        let func = match env.function_info(&self.function) {
+            Some((_index, func)) => func,
+            None => return None, // emit_bytecode will catch the error
+        };
+
+        Some(Box::new(func(&args)))
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -226,6 +300,10 @@ impl Expr for IdentifierExpr {
         Ok(())
     }
 
+    fn fold(&mut self, _: &Environment) -> Option<Box<dyn Expr>> {
+        None
+    }
+
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -245,6 +323,10 @@ impl Expr for f64 {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+
+    fn fold(&mut self, _: &Environment) -> Option<Box<dyn Expr>> {
+        None
     }
 
     fn values_equal(&self, other: &dyn Expr) -> bool {

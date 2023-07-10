@@ -5,7 +5,7 @@ mod parser;
 mod tokenizer;
 mod vm;
 
-pub use environment::{Environment, Function};
+pub use environment::{Environment, Function, OptimizationLevel};
 pub use error::Error;
 
 pub struct Expression<'a> {
@@ -31,7 +31,13 @@ impl<'a> Expression<'a> {
 
 pub fn compile<'a>(src: &str, env: &'a Environment) -> Result<Expression<'a>, Error> {
     let tokens = tokenizer::tokenize(src)?;
-    let expr = parser::parse(&tokens)?;
+    let mut expr = parser::parse(&tokens)?;
+
+    if env.optimization_level >= OptimizationLevel::Basic {
+        if let Some(e) = expr.fold(env) {
+            expr = e;
+        }
+    }
 
     let mut bc = Vec::with_capacity(64);
     expr.emit_bytecode(env, &mut bc)?;
