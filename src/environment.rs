@@ -6,28 +6,27 @@ pub enum Function {
     Vararg(fn(&[f64]) -> f64),
 }
 
+impl Into<Function> for fn(f64, f64) -> f64 {
+    fn into(self) -> Function {
+        Function::Double(self)
+    }
+}
+
 pub struct Environment {
     locals: Vec<String>,
     functions: Vec<(String, Function)>,
 }
 
 impl Environment {
-    pub fn new() -> Environment {
+    pub fn new(locals: &[&str]) -> Environment {
         Environment {
-            locals: Vec::new(),
+            locals: locals.iter().map(|s| (*s).to_owned()).collect(),
             functions: Vec::new(),
         }
     }
 
-    pub fn add_local(&mut self, name: &str) {
-        self.locals.push(name.to_owned());
-    }
-
-    pub fn to_input(&self, values: &[f64]) -> Input {
-        Input {
-            values: values.into(),
-            functions: self.functions.iter().map(|(_, func)| func.clone()).collect(),
-        }
+    pub fn add_function(&mut self, name: &str, func: Function) {
+        self.functions.push((name.to_owned(), func));
     }
 
     pub(crate) fn index_of_item(&self, name: &str) -> Option<usize> {
@@ -40,29 +39,8 @@ impl Environment {
             .find(|(_index, (s, _func))| s == name)
             .map(|(index, (_, func))| (index, func))
     }
-}
 
-pub trait AddFunction<F> {
-    fn add_function(&mut self, name: &str, f: F);
-}
-
-impl AddFunction<fn(f64, f64) -> f64> for Environment {
-    fn add_function(&mut self, name: &str, f: fn(f64, f64) -> f64) {
-        self.functions.push((name.to_owned(), Function::Double(f)));
-    }
-}
-
-pub struct Input {
-    values: Vec<f64>,
-    functions: Vec<Function>,
-}
-
-impl Input {
-    pub(crate) fn item(&self, index: usize) -> Option<f64> {
-        self.values.get(index).copied()
-    }
-
-    pub(crate) fn function(&self, index: usize) -> Option<&Function> {
-        self.functions.get(index)
+    pub(crate) fn get_function(&self, func_index: usize) -> Option<&Function> {
+        self.functions.get(func_index).map(|(_name, func)| func)
     }
 }

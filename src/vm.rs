@@ -1,8 +1,8 @@
-use crate::environment::{Input, Function};
+use crate::environment::{Environment, Function};
 use crate::error::Error;
 use crate::expression::ByteCode;
 
-pub(crate) fn eval(bc: &[ByteCode], input: &Input) -> Result<f64, Error> {
+pub(crate) fn eval(bc: &[ByteCode], input: &[f64], env: &Environment) -> Result<f64, Error> {
     let mut stack = Stack(Vec::with_capacity(32));
     let mut pc = 0;
 
@@ -16,15 +16,15 @@ pub(crate) fn eval(bc: &[ByteCode], input: &Input) -> Result<f64, Error> {
         match op {
             LoadConst(val) => stack.push(*val),
             LoadItem { index } => {
-                let val = match input.item(*index) {
-                    Some(v) => v,
+                let val = match input.get(*index) {
+                    Some(v) => *v,
                     None => return Err(Error::new(0, 0, "VM Error")),
                 };
 
                 stack.push(val);
             },
             Call { func_index, line, column } => {
-                let function = match input.function(*func_index) {
+                let function = match env.get_function(*func_index) {
                     Some(f) => f,
                     None => return Err(Error::new(0, 0, "VM Error")),
                 };
@@ -43,7 +43,7 @@ pub(crate) fn eval(bc: &[ByteCode], input: &Input) -> Result<f64, Error> {
                 stack.push(result);
             },
             CallVararg { func_index, num_args, line, column } => {
-                let function = match input.function(*func_index) {
+                let function = match env.get_function(*func_index) {
                     Some(f) => f,
                     None => return Err(Error::new(0, 0, "VM Error")),
                 };
