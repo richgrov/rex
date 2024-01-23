@@ -18,13 +18,17 @@ impl Environment {
     }
 
     pub(crate) fn function_info(&self, name: &str) -> Option<(usize, Function)> {
-        self.functions.iter()
+        self.functions
+            .iter()
             .enumerate()
             .find(|(_index, (s, _func))| s == name)
             .map(|(index, (_, func))| (index, func.clone()))
     }
 
     pub(crate) fn get_function(&self, func_index: usize) -> Option<Function> {
-        self.functions.get(func_index).map(|(_name, func)| func).copied()
+        self.functions
+            .get(func_index)
+            .map(|(_name, func)| func)
+            .copied()
     }
 }

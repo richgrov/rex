@@ -3,7 +3,7 @@ use rex::Environment;
 fn all(args: &[f64]) -> f64 {
     for arg in args {
         if *arg == 0. {
-            return 0.
+            return 0.;
         }
     }
 

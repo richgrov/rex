@@ -22,8 +22,13 @@ pub(crate) fn eval(bc: &[ByteCode], input: &[f64], env: &Environment) -> Result<
                 };
 
                 stack.push(val);
-            },
-            Call { func_index, num_args, line, column } => {
+            }
+            Call {
+                func_index,
+                num_args,
+                line,
+                column,
+            } => {
                 let function = match env.get_function(*func_index) {
                     Some(f) => f,
                     None => return Err(Error::new(0, 0, "VM Error")),
@@ -36,24 +41,36 @@ pub(crate) fn eval(bc: &[ByteCode], input: &[f64], env: &Environment) -> Result<
 
                 let result = function(&args);
                 if result.is_nan() {
-                    return Err(Error::new(*line, *column, "function returned Nan"))
+                    return Err(Error::new(*line, *column, "function returned Nan"));
                 }
 
                 stack.push(result);
-            },
-            LessThan => { stack.cmp(|a, b| a < b)?; },
-            LessEqual => { stack.cmp(|a, b| a <= b)?; },
-            GreaterEqual => { stack.cmp(|a, b| a >= b)?; },
-            GreaterThan => { stack.cmp(|a, b| a > b)?; },
-            Equal => { stack.cmp(|a, b| a == b)?; },
-            Add => { stack.math(|a, b| a + b)? },
-            Sub => { stack.math(|a, b| a - b)? },
-            Multiply => { stack.math(|a, b| a * b)? },
-            Divide => { stack.math(|a, b| a / b)? },
-            Remainder => { stack.math(|a, b| a % b)? },
-            JumpIfZero { offset } => if stack.pop()? == 0.0 {
-                pc += *offset;
-            },
+            }
+            LessThan => {
+                stack.cmp(|a, b| a < b)?;
+            }
+            LessEqual => {
+                stack.cmp(|a, b| a <= b)?;
+            }
+            GreaterEqual => {
+                stack.cmp(|a, b| a >= b)?;
+            }
+            GreaterThan => {
+                stack.cmp(|a, b| a > b)?;
+            }
+            Equal => {
+                stack.cmp(|a, b| a == b)?;
+            }
+            Add => stack.math(|a, b| a + b)?,
+            Sub => stack.math(|a, b| a - b)?,
+            Multiply => stack.math(|a, b| a * b)?,
+            Divide => stack.math(|a, b| a / b)?,
+            Remainder => stack.math(|a, b| a % b)?,
+            JumpIfZero { offset } => {
+                if stack.pop()? == 0.0 {
+                    pc += *offset;
+                }
+            }
             Jump { offset } => pc += *offset,
         }
 
@@ -61,9 +78,14 @@ pub(crate) fn eval(bc: &[ByteCode], input: &[f64], env: &Environment) -> Result<
     }
 
     if stack.len() != 1 {
-        return Err(Error::new(0, 0,
-            &format!("VM ERROR: expected 1 value on top of stack but had {}", stack.len())
-        ))
+        return Err(Error::new(
+            0,
+            0,
+            &format!(
+                "VM ERROR: expected 1 value on top of stack but had {}",
+                stack.len()
+            ),
+        ));
     }
 
     Ok(stack.pop()?)
@@ -75,7 +97,7 @@ impl Stack {
     fn push(&mut self, val: f64) {
         self.0.push(val);
     }
-    
+
     fn pop(&mut self) -> Result<f64, Error> {
         self.0.pop().ok_or(Error::new(0, 0, "VM Error"))
     }

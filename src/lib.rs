@@ -42,8 +42,5 @@ pub fn compile<'a>(src: &str, env: &'a Environment) -> Result<Expression<'a>, Er
     let mut bc = Vec::with_capacity(64);
     expr.emit_bytecode(env, &mut bc)?;
 
-    Ok(Expression {
-        bc,
-        env,
-    })
+    Ok(Expression { bc, env })
 }

@@ -13,14 +13,14 @@ pub(crate) fn parse(tokens: &[Token]) -> Result<BoxedExpr> {
     let expr = parser.parse_expr()?;
 
     if parser.read_index < parser.tokens.len() {
-        return parser.error("unexpected code after expression")
+        return parser.error("unexpected code after expression");
     }
 
     Ok(expr)
 }
 
 struct Parser<'a> {
-    tokens: &'a[Token],
+    tokens: &'a [Token],
     read_index: usize,
     line: usize,
     column: usize,
@@ -33,7 +33,7 @@ impl<'a> Parser<'a> {
         while self.consume_if(TokenType::If) {
             let condition = self.parse_relative()?;
             if !self.consume_if(TokenType::Else) {
-                return self.error("expected colon following terenary")
+                return self.error("expected colon following terenary");
             }
             let when_false = self.parse_expr()?;
 
@@ -68,7 +68,7 @@ impl<'a> Parser<'a> {
                         operator,
                         right: self.parse_addition()?,
                     });
-                },
+                }
                 None => break,
             }
         }
@@ -94,7 +94,7 @@ impl<'a> Parser<'a> {
                         operator,
                         right: self.parse_multiplication()?,
                     });
-                },
+                }
                 None => break,
             }
         }
@@ -121,7 +121,7 @@ impl<'a> Parser<'a> {
                         operator,
                         right: self.parse_negative()?,
                     });
-                },
+                }
                 None => break,
             }
         }
@@ -151,11 +151,11 @@ impl<'a> Parser<'a> {
             TokenType::LParen => {
                 let expr = self.parse_expr()?;
                 if !self.consume_if(TokenType::RParen) {
-                    return self.error("expected closing parenthesis")
+                    return self.error("expected closing parenthesis");
                 }
 
                 Ok(expr)
-            },
+            }
 
             TokenType::Identifier(s) => {
                 let identifier = s.to_owned();
@@ -173,10 +173,10 @@ impl<'a> Parser<'a> {
                     Ok(Box::new(IdentifierExpr {
                         line,
                         column,
-                        identifier
+                        identifier,
                     }))
                 }
-            },
+            }
 
             TokenType::Number(n) => Ok(Box::new(*n)),
 
@@ -190,19 +190,19 @@ impl<'a> Parser<'a> {
 
         loop {
             if self.consume_if(TokenType::RParen) {
-                break
+                break;
             }
 
             arguments.push(self.parse_expr()?);
 
             if self.consume_if(TokenType::Comma) {
-                continue
+                continue;
             }
 
             if self.consume_if(TokenType::RParen) {
-                break
+                break;
             } else {
-                return self.error("expected closing parenthesis after arguments")
+                return self.error("expected closing parenthesis after arguments");
             }
         }
 
@@ -224,7 +224,7 @@ impl<'a> Parser<'a> {
                 self.line = t.line();
                 self.column = t.column();
                 Some(t.ty())
-            },
+            }
             None => None,
         }
     }
@@ -236,7 +236,7 @@ impl<'a> Parser<'a> {
             Some(t) if discriminant(t) == discriminant(&variant) => {
                 self.consume();
                 true
-            },
+            }
             _ => false,
         }
     }
@@ -248,35 +248,45 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tokenizer::{TokenType, Token};
-    use crate::expression::{ConditionalExpr, BinaryExpr, BinaryOperator, IdentifierExpr, Expr, CallExpr};
+    use crate::expression::{
+        BinaryExpr, BinaryOperator, CallExpr, ConditionalExpr, Expr, IdentifierExpr,
+    };
+    use crate::tokenizer::{Token, TokenType};
 
     #[test]
     fn conditional() {
         use TokenType::*;
         // one if 1 = 2 else three
         let tokens = &vec![
-            Identifier("one".to_owned()), If, Number(1.), Equal, Number(2.), Else,
+            Identifier("one".to_owned()),
+            If,
+            Number(1.),
+            Equal,
+            Number(2.),
+            Else,
             Identifier("three".to_owned()),
         ];
 
-        assert_equal_ast(&tokens, &ConditionalExpr {
-            condition: Box::new(BinaryExpr {
-                left: Box::new(1.),
-                operator: BinaryOperator::Equal,
-                right: Box::new(2.),
-            }),
-            when_true: Box::new(IdentifierExpr {
-                line: 0,
-                column: 0,
-                identifier: "one".to_owned(),
-            }),
-            when_false: Box::new(IdentifierExpr {
-                line: 0,
-                column: 0,
-                identifier: "three".to_owned(),
-            }),
-        });
+        assert_equal_ast(
+            &tokens,
+            &ConditionalExpr {
+                condition: Box::new(BinaryExpr {
+                    left: Box::new(1.),
+                    operator: BinaryOperator::Equal,
+                    right: Box::new(2.),
+                }),
+                when_true: Box::new(IdentifierExpr {
+                    line: 0,
+                    column: 0,
+                    identifier: "one".to_owned(),
+                }),
+                when_false: Box::new(IdentifierExpr {
+                    line: 0,
+                    column: 0,
+                    identifier: "three".to_owned(),
+                }),
+            },
+        );
     }
 
     #[test]
@@ -284,35 +294,50 @@ mod tests {
         use TokenType::*;
         // -2 % 1 + 3 * (4 - 5) / 6
         let tokens = &vec![
-            Minus, Number(2.), Percent, Number(1.), Plus, Number(3.), Star, LParen, Number(4.), Minus,
-            Number(5.), RParen, Slash, Number(6.),
+            Minus,
+            Number(2.),
+            Percent,
+            Number(1.),
+            Plus,
+            Number(3.),
+            Star,
+            LParen,
+            Number(4.),
+            Minus,
+            Number(5.),
+            RParen,
+            Slash,
+            Number(6.),
         ];
 
-        assert_equal_ast(&tokens, &BinaryExpr {
-            left: Box::new(BinaryExpr {
+        assert_equal_ast(
+            &tokens,
+            &BinaryExpr {
                 left: Box::new(BinaryExpr {
-                    left: Box::new(-1.),
-                    operator: BinaryOperator::Multiply,
-                    right: Box::new(2.),
-                }),
-                operator: BinaryOperator::Remainder,
-                right: Box::new(1.),
-            }),
-            operator: BinaryOperator::Add,
-            right: Box::new(BinaryExpr {
-                left: Box::new(BinaryExpr {
-                    left: Box::new(3.),
-                    operator: BinaryOperator::Multiply,
-                    right: Box::new(BinaryExpr {
-                        left: Box::new(4.),
-                        operator: BinaryOperator::Sub,
-                        right: Box::new(5.),
+                    left: Box::new(BinaryExpr {
+                        left: Box::new(-1.),
+                        operator: BinaryOperator::Multiply,
+                        right: Box::new(2.),
                     }),
+                    operator: BinaryOperator::Remainder,
+                    right: Box::new(1.),
                 }),
-                operator: BinaryOperator::Divide,
-                right: Box::new(6.),
-            }),
-        });
+                operator: BinaryOperator::Add,
+                right: Box::new(BinaryExpr {
+                    left: Box::new(BinaryExpr {
+                        left: Box::new(3.),
+                        operator: BinaryOperator::Multiply,
+                        right: Box::new(BinaryExpr {
+                            left: Box::new(4.),
+                            operator: BinaryOperator::Sub,
+                            right: Box::new(5.),
+                        }),
+                    }),
+                    operator: BinaryOperator::Divide,
+                    right: Box::new(6.),
+                }),
+            },
+        );
     }
 
     #[test]
@@ -320,31 +345,43 @@ mod tests {
         use TokenType::*;
         // 1 = 2 < 3 <= 4 >= 5 < 6
         let tokens = &vec![
-            Number(1.), Equal, Number(2.), LessThan, Number(3.), LessEqual, Number(4.),
-            GreaterEqual, Number(5.), LessThan, Number(6.),
+            Number(1.),
+            Equal,
+            Number(2.),
+            LessThan,
+            Number(3.),
+            LessEqual,
+            Number(4.),
+            GreaterEqual,
+            Number(5.),
+            LessThan,
+            Number(6.),
         ];
 
-        assert_equal_ast(&tokens, &BinaryExpr {
-            left: Box::new(BinaryExpr {
+        assert_equal_ast(
+            &tokens,
+            &BinaryExpr {
                 left: Box::new(BinaryExpr {
                     left: Box::new(BinaryExpr {
                         left: Box::new(BinaryExpr {
-                            left: Box::new(1.),
-                            operator: BinaryOperator::Equal,
-                            right: Box::new(2.),
+                            left: Box::new(BinaryExpr {
+                                left: Box::new(1.),
+                                operator: BinaryOperator::Equal,
+                                right: Box::new(2.),
+                            }),
+                            operator: BinaryOperator::LessThan,
+                            right: Box::new(3.),
                         }),
-                        operator: BinaryOperator::LessThan,
-                        right: Box::new(3.),
+                        operator: BinaryOperator::LessEqual,
+                        right: Box::new(4.),
                     }),
-                    operator: BinaryOperator::LessEqual,
-                    right: Box::new(4.),
+                    operator: BinaryOperator::GreaterEqual,
+                    right: Box::new(5.),
                 }),
-                operator: BinaryOperator::GreaterEqual,
-                right: Box::new(5.),
-            }),
-            operator: BinaryOperator::LessThan,
-            right: Box::new(6.)
-        });
+                operator: BinaryOperator::LessThan,
+                right: Box::new(6.),
+            },
+        );
     }
 
     #[test]
@@ -352,32 +389,44 @@ mod tests {
         use TokenType::*;
         // all(1, true, 2 + 3)
         let tokens = &vec![
-            Identifier("all".to_owned()), LParen, Number(1.), Comma,
-            TokenType::Identifier("true".to_owned()), Comma, Number(2.), Plus, Number(3.), RParen,
+            Identifier("all".to_owned()),
+            LParen,
+            Number(1.),
+            Comma,
+            TokenType::Identifier("true".to_owned()),
+            Comma,
+            Number(2.),
+            Plus,
+            Number(3.),
+            RParen,
         ];
 
-        assert_equal_ast(&tokens, &CallExpr {
-            line: 0,
-            column: 0,
-            function: "all".to_owned(),
-            arguments: vec![
-                Box::new(1.),
-                Box::new(IdentifierExpr {
-                    line: 0,
-                    column: 0,
-                    identifier: "true".to_owned(),
-                }),
-                Box::new(BinaryExpr {
-                    left: Box::new(2.),
-                    operator: BinaryOperator::Add,
-                    right: Box::new(3.),
-                }),
-            ],
-        });
+        assert_equal_ast(
+            &tokens,
+            &CallExpr {
+                line: 0,
+                column: 0,
+                function: "all".to_owned(),
+                arguments: vec![
+                    Box::new(1.),
+                    Box::new(IdentifierExpr {
+                        line: 0,
+                        column: 0,
+                        identifier: "true".to_owned(),
+                    }),
+                    Box::new(BinaryExpr {
+                        left: Box::new(2.),
+                        operator: BinaryOperator::Add,
+                        right: Box::new(3.),
+                    }),
+                ],
+            },
+        );
     }
 
     fn assert_equal_ast(token_types: &[TokenType], ast: &dyn Expr) {
-        let tokens: Vec<Token> = token_types.iter()
+        let tokens: Vec<Token> = token_types
+            .iter()
             .map(|t| Token::new(t.clone(), 0, 0))
             .collect();
 

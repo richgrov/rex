@@ -101,27 +101,31 @@ impl Tokenizer {
 
             '=' => self.token(TokenType::Equal),
 
-            '<' => if self.consume_if(|c| c == '=').is_some() {
-                self.token(TokenType::LessEqual)
-            } else {
-                self.token(TokenType::LessThan)
-            },
+            '<' => {
+                if self.consume_if(|c| c == '=').is_some() {
+                    self.token(TokenType::LessEqual)
+                } else {
+                    self.token(TokenType::LessThan)
+                }
+            }
 
-            '>' => if self.consume_if(|c| c == '=').is_some() {
-                self.token(TokenType::GreaterEqual)
-            } else {
-                self.token(TokenType::GreaterThan)
-            },
+            '>' => {
+                if self.consume_if(|c| c == '=').is_some() {
+                    self.token(TokenType::GreaterEqual)
+                } else {
+                    self.token(TokenType::GreaterThan)
+                }
+            }
 
             c if c.is_ascii_digit() => self.lex_numeric(c),
 
             c => {
                 if c.is_ascii_alphabetic() || c == '_' {
-                    return Some(self.lex_identifier_or_keyword(c))
+                    return Some(self.lex_identifier_or_keyword(c));
                 }
 
                 self.error(&format!("unexpected character '{}'", c))
-            },
+            }
         })
     }
 
@@ -130,7 +134,7 @@ impl Tokenizer {
             match self.peek() {
                 Some(' ') | Some('\t') | Some('\n') | Some('\r') | Some(FORM_FEED) => {
                     self.consume();
-                },
+                }
                 _ => break,
             }
         }
@@ -140,7 +144,10 @@ impl Tokenizer {
         let mut chars = String::new();
         loop {
             match self.peek() {
-                Some(c) if c.is_ascii_digit() => { self.consume(); chars.push(c) },
+                Some(c) if c.is_ascii_digit() => {
+                    self.consume();
+                    chars.push(c)
+                }
                 _ => break,
             }
         }
@@ -151,7 +158,10 @@ impl Tokenizer {
         let mut chars = String::new();
         loop {
             match self.peek() {
-                Some(c) if c.is_ascii_hexdigit() => { self.consume(); chars.push(c) },
+                Some(c) if c.is_ascii_hexdigit() => {
+                    self.consume();
+                    chars.push(c)
+                }
                 _ => break,
             }
         }
@@ -176,11 +186,10 @@ impl Tokenizer {
             } else {
                 match i64::from_str_radix(&digits, 16) {
                     Ok(i) => self.token(TokenType::Number(i as f64)),
-                    Err(e) => self.error_or_panic_if_debug(
-                        &format!("consuming hexadecimal failed: {}", e)
-                    ),
+                    Err(e) => self
+                        .error_or_panic_if_debug(&format!("consuming hexadecimal failed: {}", e)),
                 }
-            }
+            };
         }
 
         let mut chars = String::new();
@@ -191,20 +200,19 @@ impl Tokenizer {
             if digits.is_empty() {
                 // This should panic because `initial_char` was a period. This function can only be
                 // called with `initial_char` is a period if the lexer knew a number followed it
-                return self.error_or_panic_if_debug("no number following decial")
+                return self.error_or_panic_if_debug("no number following decial");
             }
             chars += &digits;
         } else {
             chars += &self.consume_digits();
-        
+
             if self.consume_if(|c| c == '.').is_some() {
                 chars.push('.');
 
                 let digits = self.consume_digits();
                 if digits.is_empty() {
-                    return self.error(
-                        "floating-point literals must be followed by at least one number"
-                    )
+                    return self
+                        .error("floating-point literals must be followed by at least one number");
                 }
                 chars += &digits;
             }
@@ -219,16 +227,16 @@ impl Tokenizer {
 
             let digits = self.consume_digits();
             if digits.is_empty() {
-                return self.error("exponent must be followed by at least one number")
+                return self.error("exponent must be followed by at least one number");
             }
             chars += &digits;
         }
 
         self.token(match chars.parse() {
             Ok(n) => TokenType::Number(n),
-            Err(e) => return self.error_or_panic_if_debug(
-                &format!("consuming number failed: {}", e)
-            ),
+            Err(e) => {
+                return self.error_or_panic_if_debug(&format!("consuming number failed: {}", e))
+            }
         })
     }
 
@@ -243,9 +251,9 @@ impl Tokenizer {
                         self.consume();
                         identifier.push(c);
                     } else {
-                        break
+                        break;
                     }
-                },
+                }
                 _ => break,
             }
         }
@@ -260,7 +268,7 @@ impl Tokenizer {
     fn peek(&self) -> Option<char> {
         self.get_at(self.read_index)
     }
-    
+
     fn get_at(&self, index: usize) -> Option<char> {
         self.text.get(index).copied()
     }
@@ -271,7 +279,7 @@ impl Tokenizer {
             self.line += 1;
             self.column = 0; // Consuming the first character will set the column to 1
         } else {
-            self.column +=1 ;
+            self.column += 1;
         }
 
         self.read_index += 1;
@@ -321,8 +329,23 @@ mod tests {
         ";
 
         let tokens = [
-            LParen, RParen, LParen, RParen, Plus, Minus, Star, Slash, Percent, Comma, Equal,
-            LessThan, LessEqual, GreaterThan, GreaterEqual, Else, If,
+            LParen,
+            RParen,
+            LParen,
+            RParen,
+            Plus,
+            Minus,
+            Star,
+            Slash,
+            Percent,
+            Comma,
+            Equal,
+            LessThan,
+            LessEqual,
+            GreaterThan,
+            GreaterEqual,
+            Else,
+            If,
         ];
 
         assert_equal_tokens(string, &tokens);
@@ -346,7 +369,10 @@ mod tests {
 
         assert_equal_tokens(string, &tokens);
 
-        assert_ne!(*tokenize("1dentifier").unwrap()[0].ty(), Identifier("1dentifier".to_string()));
+        assert_ne!(
+            *tokenize("1dentifier").unwrap()[0].ty(),
+            Identifier("1dentifier".to_string())
+        );
     }
 
     #[test]

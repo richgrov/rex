@@ -7,8 +7,15 @@ use crate::error::Error;
 #[derive(Clone)]
 pub(crate) enum ByteCode {
     LoadConst(f64),
-    LoadItem{ index: usize },
-    Call{ func_index: usize, num_args: usize, line: usize, column: usize },
+    LoadItem {
+        index: usize,
+    },
+    Call {
+        func_index: usize,
+        num_args: usize,
+        line: usize,
+        column: usize,
+    },
     LessThan,
     LessEqual,
     GreaterEqual,
@@ -19,8 +26,12 @@ pub(crate) enum ByteCode {
     Multiply,
     Divide,
     Remainder,
-    JumpIfZero{ offset: usize },
-    Jump{ offset: usize},
+    JumpIfZero {
+        offset: usize,
+    },
+    Jump {
+        offset: usize,
+    },
 }
 
 impl std::fmt::Display for ByteCode {
@@ -28,8 +39,16 @@ impl std::fmt::Display for ByteCode {
         match self {
             ByteCode::LoadConst(val) => write!(f, "load {}", val),
             ByteCode::LoadItem { index } => write!(f, "load [{}]", index),
-            ByteCode::Call { func_index, num_args, line, column } =>
-                write!(f, "call, {}, {} @ {}:{}", func_index, num_args, line, column),
+            ByteCode::Call {
+                func_index,
+                num_args,
+                line,
+                column,
+            } => write!(
+                f,
+                "call, {}, {} @ {}:{}",
+                func_index, num_args, line, column
+            ),
             ByteCode::LessThan => write!(f, "lessThan"),
             ByteCode::LessEqual => write!(f, "lessEqual"),
             ByteCode::GreaterEqual => write!(f, "greaterEqual"),
@@ -81,10 +100,14 @@ impl Expr for ConditionalExpr {
 
         let mut true_path = Vec::new();
         self.when_true.emit_bytecode(env, &mut true_path)?;
-        true_path.push(ByteCode::Jump{ offset: false_path.len() });
+        true_path.push(ByteCode::Jump {
+            offset: false_path.len(),
+        });
 
         self.condition.emit_bytecode(env, bc)?;
-        bc.push(ByteCode::JumpIfZero{ offset: true_path.len() });
+        bc.push(ByteCode::JumpIfZero {
+            offset: true_path.len(),
+        });
         bc.extend_from_slice(&true_path);
         bc.extend_from_slice(&false_path);
         Ok(())
@@ -107,13 +130,14 @@ impl Expr for ConditionalExpr {
     }
 
     fn values_equal(&self, other: &dyn Expr) -> bool {
-        other.as_any()
+        other
+            .as_any()
             .downcast_ref::<ConditionalExpr>()
-            .map_or(false, |expr|
-                self.condition.values_equal(expr.condition.deref()) &&
-                self.when_true.values_equal(expr.when_true.deref()) &&
-                self.when_false.values_equal(expr.when_false.deref())
-            )
+            .map_or(false, |expr| {
+                self.condition.values_equal(expr.condition.deref())
+                    && self.when_true.values_equal(expr.when_true.deref())
+                    && self.when_false.values_equal(expr.when_false.deref())
+            })
     }
 }
 
@@ -169,11 +193,11 @@ impl Expr for BinaryExpr {
         let a = self.left.as_any().downcast_ref::<f64>()?;
         let b = self.right.as_any().downcast_ref::<f64>()?;
         if a.is_nan() || b.is_nan() {
-            return Some(Box::new(f64::NAN))
+            return Some(Box::new(f64::NAN));
         }
 
         let result = match self.operator {
-            BinaryOperator::LessThan => (a < b) as i32 as f64, 
+            BinaryOperator::LessThan => (a < b) as i32 as f64,
             BinaryOperator::LessEqual => (a <= b) as i32 as f64,
             BinaryOperator::GreaterEqual => (a >= b) as i32 as f64,
             BinaryOperator::GreaterThan => (a > b) as i32 as f64,
@@ -181,11 +205,13 @@ impl Expr for BinaryExpr {
             BinaryOperator::Add => a + b,
             BinaryOperator::Sub => a - b,
             BinaryOperator::Multiply => a * b,
-            BinaryOperator::Divide => if *b == 0.0 {
-                f64::NAN
-            } else {
-                a / b
-            },
+            BinaryOperator::Divide => {
+                if *b == 0.0 {
+                    f64::NAN
+                } else {
+                    a / b
+                }
+            }
             BinaryOperator::Remainder => a % b,
         };
 
@@ -197,13 +223,14 @@ impl Expr for BinaryExpr {
     }
 
     fn values_equal(&self, other: &dyn Expr) -> bool {
-        other.as_any()
+        other
+            .as_any()
             .downcast_ref::<BinaryExpr>()
-            .map_or(false, |expr|
-                self.left.values_equal(expr.left.deref()) &&
-                self.operator == expr.operator &&
-                self.right.values_equal(expr.right.deref())
-            )
+            .map_or(false, |expr| {
+                self.left.values_equal(expr.left.deref())
+                    && self.operator == expr.operator
+                    && self.right.values_equal(expr.right.deref())
+            })
     }
 }
 
@@ -226,7 +253,7 @@ impl Expr for CallExpr {
             None => return Err(Error::new(self.line, self.column, "function not found")),
         };
 
-        bc.push(ByteCode::Call{
+        bc.push(ByteCode::Call {
             func_index: index,
             num_args: self.arguments.len(),
             line: self.line,
@@ -264,16 +291,17 @@ impl Expr for CallExpr {
     }
 
     fn values_equal(&self, other: &dyn Expr) -> bool {
-        other.as_any()
+        other
+            .as_any()
             .downcast_ref::<CallExpr>()
             .map_or(false, |expr| {
                 if self.arguments.len() != expr.arguments.len() {
-                    return false
+                    return false;
                 }
 
                 for i in 0..self.arguments.len() {
                     if !self.arguments[i].values_equal(expr.arguments[i].deref()) {
-                        return false
+                        return false;
                     }
                 }
 
@@ -296,7 +324,7 @@ impl Expr for IdentifierExpr {
             None => return Err(Error::new(self.line, self.column, "identifier not found")),
         };
 
-        bc.push(ByteCode::LoadItem{ index });
+        bc.push(ByteCode::LoadItem { index });
         Ok(())
     }
 
@@ -309,7 +337,8 @@ impl Expr for IdentifierExpr {
     }
 
     fn values_equal(&self, other: &dyn Expr) -> bool {
-        other.as_any()
+        other
+            .as_any()
             .downcast_ref::<IdentifierExpr>()
             .map_or(false, |expr| expr.identifier == self.identifier)
     }
@@ -330,7 +359,8 @@ impl Expr for f64 {
     }
 
     fn values_equal(&self, other: &dyn Expr) -> bool {
-        other.as_any()
+        other
+            .as_any()
             .downcast_ref::<f64>()
             .map_or(false, |val| *val == *self)
     }
