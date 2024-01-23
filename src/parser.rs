@@ -1,3 +1,5 @@
+use bigdecimal::BigDecimal;
+
 use crate::error::{Error, Result};
 use crate::expression::*;
 use crate::tokenizer::{Token, TokenType};
@@ -132,7 +134,7 @@ impl<'a> Parser<'a> {
     fn parse_negative(&mut self) -> Result<BoxedExpr> {
         if self.consume_if(TokenType::Minus) {
             Ok(Box::new(BinaryExpr {
-                left: Box::new(-1.),
+                left: Box::new(BigDecimal::from(-1)),
                 operator: BinaryOperator::Multiply,
                 right: self.parse_primary()?,
             }))
@@ -178,7 +180,7 @@ impl<'a> Parser<'a> {
                 }
             }
 
-            TokenType::Number(n) => Ok(Box::new(*n)),
+            TokenType::Number(n) => Ok(Box::new(n.clone())),
 
             _ => self.error("expected expression"),
         }
@@ -248,6 +250,8 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
+    use bigdecimal::{BigDecimal, One};
+
     use crate::expression::{
         BinaryExpr, BinaryOperator, CallExpr, ConditionalExpr, Expr, IdentifierExpr,
     };
@@ -260,9 +264,9 @@ mod tests {
         let tokens = &vec![
             Identifier("one".to_owned()),
             If,
-            Number(1.),
+            Number(BigDecimal::one()),
             Equal,
-            Number(2.),
+            Number(BigDecimal::from(2)),
             Else,
             Identifier("three".to_owned()),
         ];
@@ -271,9 +275,9 @@ mod tests {
             &tokens,
             &ConditionalExpr {
                 condition: Box::new(BinaryExpr {
-                    left: Box::new(1.),
+                    left: Box::new(BigDecimal::one()),
                     operator: BinaryOperator::Equal,
-                    right: Box::new(2.),
+                    right: Box::new(BigDecimal::from(2)),
                 }),
                 when_true: Box::new(IdentifierExpr {
                     line: 0,
@@ -295,19 +299,19 @@ mod tests {
         // -2 % 1 + 3 * (4 - 5) / 6
         let tokens = &vec![
             Minus,
-            Number(2.),
+            Number(BigDecimal::from(2)),
             Percent,
-            Number(1.),
+            Number(BigDecimal::one()),
             Plus,
-            Number(3.),
+            Number(BigDecimal::from(3)),
             Star,
             LParen,
-            Number(4.),
+            Number(BigDecimal::from(4)),
             Minus,
-            Number(5.),
+            Number(BigDecimal::from(5)),
             RParen,
             Slash,
-            Number(6.),
+            Number(BigDecimal::from(6)),
         ];
 
         assert_equal_ast(
@@ -315,26 +319,26 @@ mod tests {
             &BinaryExpr {
                 left: Box::new(BinaryExpr {
                     left: Box::new(BinaryExpr {
-                        left: Box::new(-1.),
+                        left: Box::new(BigDecimal::from(-1)),
                         operator: BinaryOperator::Multiply,
-                        right: Box::new(2.),
+                        right: Box::new(BigDecimal::from(2)),
                     }),
                     operator: BinaryOperator::Remainder,
-                    right: Box::new(1.),
+                    right: Box::new(BigDecimal::one()),
                 }),
                 operator: BinaryOperator::Add,
                 right: Box::new(BinaryExpr {
                     left: Box::new(BinaryExpr {
-                        left: Box::new(3.),
+                        left: Box::new(BigDecimal::from(3)),
                         operator: BinaryOperator::Multiply,
                         right: Box::new(BinaryExpr {
-                            left: Box::new(4.),
+                            left: Box::new(BigDecimal::from(4)),
                             operator: BinaryOperator::Sub,
-                            right: Box::new(5.),
+                            right: Box::new(BigDecimal::from(5)),
                         }),
                     }),
                     operator: BinaryOperator::Divide,
-                    right: Box::new(6.),
+                    right: Box::new(BigDecimal::from(6)),
                 }),
             },
         );
@@ -345,17 +349,17 @@ mod tests {
         use TokenType::*;
         // 1 = 2 < 3 <= 4 >= 5 < 6
         let tokens = &vec![
-            Number(1.),
+            Number(BigDecimal::one()),
             Equal,
-            Number(2.),
+            Number(BigDecimal::from(2)),
             LessThan,
-            Number(3.),
+            Number(BigDecimal::from(3)),
             LessEqual,
-            Number(4.),
+            Number(BigDecimal::from(4)),
             GreaterEqual,
-            Number(5.),
+            Number(BigDecimal::from(5)),
             LessThan,
-            Number(6.),
+            Number(BigDecimal::from(6)),
         ];
 
         assert_equal_ast(
@@ -365,21 +369,21 @@ mod tests {
                     left: Box::new(BinaryExpr {
                         left: Box::new(BinaryExpr {
                             left: Box::new(BinaryExpr {
-                                left: Box::new(1.),
+                                left: Box::new(BigDecimal::one()),
                                 operator: BinaryOperator::Equal,
-                                right: Box::new(2.),
+                                right: Box::new(BigDecimal::from(2)),
                             }),
                             operator: BinaryOperator::LessThan,
-                            right: Box::new(3.),
+                            right: Box::new(BigDecimal::from(3)),
                         }),
                         operator: BinaryOperator::LessEqual,
-                        right: Box::new(4.),
+                        right: Box::new(BigDecimal::from(4)),
                     }),
                     operator: BinaryOperator::GreaterEqual,
-                    right: Box::new(5.),
+                    right: Box::new(BigDecimal::from(5)),
                 }),
                 operator: BinaryOperator::LessThan,
-                right: Box::new(6.),
+                right: Box::new(BigDecimal::from(6)),
             },
         );
     }
@@ -391,13 +395,13 @@ mod tests {
         let tokens = &vec![
             Identifier("all".to_owned()),
             LParen,
-            Number(1.),
+            Number(BigDecimal::one()),
             Comma,
             TokenType::Identifier("true".to_owned()),
             Comma,
-            Number(2.),
+            Number(BigDecimal::from(2)),
             Plus,
-            Number(3.),
+            Number(BigDecimal::from(3)),
             RParen,
         ];
 
@@ -408,16 +412,16 @@ mod tests {
                 column: 0,
                 function: "all".to_owned(),
                 arguments: vec![
-                    Box::new(1.),
+                    Box::new(BigDecimal::one()),
                     Box::new(IdentifierExpr {
                         line: 0,
                         column: 0,
                         identifier: "true".to_owned(),
                     }),
                     Box::new(BinaryExpr {
-                        left: Box::new(2.),
+                        left: Box::new(BigDecimal::from(2)),
                         operator: BinaryOperator::Add,
-                        right: Box::new(3.),
+                        right: Box::new(BigDecimal::from(3)),
                     }),
                 ],
             },

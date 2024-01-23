@@ -5,6 +5,7 @@ mod parser;
 mod tokenizer;
 mod vm;
 
+use bigdecimal::BigDecimal;
 pub use environment::{Environment, Function, OptimizationLevel};
 pub use error::Error;
 
@@ -14,7 +15,7 @@ pub struct Expression<'a> {
 }
 
 impl<'a> Expression<'a> {
-    pub fn eval(&self, input: &[f64]) -> Result<f64, Error> {
+    pub fn eval(&self, input: &[BigDecimal]) -> Result<BigDecimal, Error> {
         vm::eval(&self.bc, input, self.env)
     }
 

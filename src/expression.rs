@@ -1,12 +1,14 @@
 use std::any::Any;
 use std::ops::Deref;
 
+use bigdecimal::{BigDecimal, Zero};
+
 use crate::environment::Environment;
 use crate::error::Error;
 
 #[derive(Clone)]
 pub(crate) enum ByteCode {
-    LoadConst(f64),
+    LoadConst(BigDecimal),
     LoadItem {
         index: usize,
     },
@@ -118,9 +120,8 @@ impl Expr for ConditionalExpr {
             self.condition = cond;
         }
 
-        match self.condition.as_any().downcast_ref::<f64>()? {
-            val if val.is_nan() => Some(Box::new(f64::NAN)),
-            val if *val == 0.0 => self.when_false.fold(env),
+        match self.condition.as_any().downcast_ref::<BigDecimal>()? {
+            val if val.is_zero() => self.when_false.fold(env),
             _ => self.when_true.fold(env),
         }
     }
@@ -190,28 +191,19 @@ impl Expr for BinaryExpr {
             self.right = right;
         }
 
-        let a = self.left.as_any().downcast_ref::<f64>()?;
-        let b = self.right.as_any().downcast_ref::<f64>()?;
-        if a.is_nan() || b.is_nan() {
-            return Some(Box::new(f64::NAN));
-        }
+        let a = self.left.as_any().downcast_ref::<BigDecimal>()?;
+        let b = self.right.as_any().downcast_ref::<BigDecimal>()?;
 
         let result = match self.operator {
-            BinaryOperator::LessThan => (a < b) as i32 as f64,
-            BinaryOperator::LessEqual => (a <= b) as i32 as f64,
-            BinaryOperator::GreaterEqual => (a >= b) as i32 as f64,
-            BinaryOperator::GreaterThan => (a > b) as i32 as f64,
-            BinaryOperator::Equal => (a == b) as i32 as f64,
+            BinaryOperator::LessThan => BigDecimal::from((a < b) as i64),
+            BinaryOperator::LessEqual => BigDecimal::from((a <= b) as i64),
+            BinaryOperator::GreaterEqual => BigDecimal::from((a >= b) as i64),
+            BinaryOperator::GreaterThan => BigDecimal::from((a > b) as i64),
+            BinaryOperator::Equal => BigDecimal::from((a == b) as i64),
             BinaryOperator::Add => a + b,
             BinaryOperator::Sub => a - b,
             BinaryOperator::Multiply => a * b,
-            BinaryOperator::Divide => {
-                if *b == 0.0 {
-                    f64::NAN
-                } else {
-                    a / b
-                }
-            }
+            BinaryOperator::Divide => a / b,
             BinaryOperator::Remainder => a % b,
         };
 
@@ -271,9 +263,8 @@ impl Expr for CallExpr {
 
         let mut args = Vec::with_capacity(self.arguments.len());
         for arg in &self.arguments {
-            match arg.as_any().downcast_ref::<f64>() {
-                Some(val) if val.is_nan() => return Some(Box::new(*val)),
-                Some(val) => args.push(*val),
+            match arg.as_any().downcast_ref::<BigDecimal>() {
+                Some(val) => args.push(val.clone()),
                 None => return None,
             }
         }
@@ -344,9 +335,9 @@ impl Expr for IdentifierExpr {
     }
 }
 
-impl Expr for f64 {
+impl Expr for BigDecimal {
     fn emit_bytecode(&self, _: &Environment, bc: &mut Vec<ByteCode>) -> Result<(), Error> {
-        bc.push(ByteCode::LoadConst(*self));
+        bc.push(ByteCode::LoadConst(self.clone()));
         Ok(())
     }
 
@@ -361,7 +352,7 @@ impl Expr for f64 {
     fn values_equal(&self, other: &dyn Expr) -> bool {
         other
             .as_any()
-            .downcast_ref::<f64>()
+            .downcast_ref::<BigDecimal>()
             .map_or(false, |val| *val == *self)
     }
 }

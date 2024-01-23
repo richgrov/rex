@@ -1,13 +1,14 @@
+use bigdecimal::{BigDecimal, One, Zero};
 use rex::Environment;
 
-fn all(args: &[f64]) -> f64 {
+fn all(args: &[BigDecimal]) -> BigDecimal {
     for arg in args {
-        if *arg == 0. {
-            return 0.;
+        if arg.is_zero() {
+            return BigDecimal::zero();
         }
     }
 
-    1.
+    BigDecimal::one()
 }
 
 fn main() {
@@ -18,13 +19,17 @@ fn main() {
     };
 
     for line in std::io::stdin().lines() {
-        if let Err(e) = eval(&line.unwrap(), &env, &[1.0, 2.0]) {
+        if let Err(e) = eval(
+            &line.unwrap(),
+            &env,
+            &[BigDecimal::one(), BigDecimal::from(2)],
+        ) {
             println!("error: {}", e,);
         }
     }
 }
 
-fn eval(mut src: &str, env: &Environment, input: &[f64]) -> Result<(), rex::Error> {
+fn eval(mut src: &str, env: &Environment, input: &[BigDecimal]) -> Result<(), rex::Error> {
     let disassemble = if src.ends_with("#disassemble") {
         src = src.trim_end_matches("#disassemble");
         true

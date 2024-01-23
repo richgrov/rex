@@ -1,4 +1,6 @@
-pub type Function = fn(&[f64]) -> f64;
+use bigdecimal::BigDecimal;
+
+pub type Function = fn(&[BigDecimal]) -> BigDecimal;
 
 #[derive(PartialEq, PartialOrd)]
 pub enum OptimizationLevel {

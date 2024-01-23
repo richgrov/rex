@@ -1,3 +1,5 @@
+use bigdecimal::{BigDecimal, Num};
+
 use crate::error::{Error, Result};
 
 const FORM_FEED: char = '\u{000c}';
@@ -20,7 +22,7 @@ pub(crate) enum TokenType {
     If,
     Else,
     Identifier(String),
-    Number(f64),
+    Number(BigDecimal),
 }
 
 #[derive(Debug)]
@@ -184,8 +186,8 @@ impl Tokenizer {
             return if digits.is_empty() {
                 self.error("\"0x\" must be followed by at least one hexadecimal character")
             } else {
-                match i64::from_str_radix(&digits, 16) {
-                    Ok(i) => self.token(TokenType::Number(i as f64)),
+                match u64::from_str_radix(&digits, 16) {
+                    Ok(i) => self.token(TokenType::Number(BigDecimal::from(i))),
                     Err(e) => self
                         .error_or_panic_if_debug(&format!("consuming hexadecimal failed: {}", e)),
                 }
@@ -318,7 +320,10 @@ impl Tokenizer {
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use super::{tokenize, Token, TokenType};
+    use bigdecimal::{BigDecimal, FromPrimitive};
     use TokenType::*;
 
     #[test]
@@ -377,40 +382,28 @@ mod tests {
 
     #[test]
     fn numeric() {
-        let string = "
-            1 .2 0.3 .4e1 .5e+2 .6e-1
-            0.7e3 0.8e+4 0.99e-5
-        ";
-
-        let tokens = [
-            Number(1.0),
-            Number(0.2),
-            Number(0.3),
-            Number(0.4e1),
-            Number(0.5e2),
-            Number(0.6e-1),
-            Number(0.7e3),
-            Number(0.8e4),
-            Number(0.99e-5),
+        let numbers = [
+            "1", ".2", "0.3", ".4e1", ".5e+2", ".6e-1", "0.7e3", "0.8e+4", "0.99e-5",
         ];
+        let string = numbers.join(" ");
+        let tokens = numbers.map(|n| TokenType::Number(BigDecimal::from_str(n).unwrap()));
 
-        assert_equal_tokens(string, &tokens);
+        assert_equal_tokens(&string, &tokens);
 
         assert_error("1.");
     }
 
     #[test]
     fn hex() {
-        let string = "0x1 0x02 0x102030 0xCafeBabe";
-
-        let tokens = [
-            Number(1.0),
-            Number(2.0),
-            Number(0x102030 as f64),
-            Number(0xCAFEBABE as i64 as f64),
-        ];
-
-        assert_equal_tokens(string, &tokens);
+        let numbers = ["0x1", "0x02", "0x102030", "0xCafeBabe"];
+        let string = numbers.join(" ");
+        let tokens = numbers.map(|n| {
+            // have to use u64::from_str_radix because BigDecimal::from_str_radix only supports
+            // radix=10
+            let parsed = i64::from_str_radix(&n[2..], 16).unwrap();
+            TokenType::Number(BigDecimal::from(parsed))
+        });
+        assert_equal_tokens(&string, &tokens);
     }
 
     #[test]

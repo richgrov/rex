@@ -1,8 +1,14 @@
+use bigdecimal::{BigDecimal, One, Zero};
+
 use crate::environment::Environment;
 use crate::error::Error;
 use crate::expression::ByteCode;
 
-pub(crate) fn eval(bc: &[ByteCode], input: &[f64], env: &Environment) -> Result<f64, Error> {
+pub(crate) fn eval(
+    bc: &[ByteCode],
+    input: &[BigDecimal],
+    env: &Environment,
+) -> Result<BigDecimal, Error> {
     let mut stack = Stack(Vec::with_capacity(32));
     let mut pc = 0;
 
@@ -14,20 +20,20 @@ pub(crate) fn eval(bc: &[ByteCode], input: &[f64], env: &Environment) -> Result<
 
         use ByteCode::*;
         match op {
-            LoadConst(val) => stack.push(*val),
+            LoadConst(val) => stack.push(val.clone()),
             LoadItem { index } => {
                 let val = match input.get(*index) {
-                    Some(v) => *v,
+                    Some(v) => v,
                     None => return Err(Error::new(0, 0, "VM Error")),
                 };
 
-                stack.push(val);
+                stack.push(val.clone());
             }
             Call {
                 func_index,
                 num_args,
-                line,
-                column,
+                line: _,
+                column: _,
             } => {
                 let function = match env.get_function(*func_index) {
                     Some(f) => f,
@@ -40,10 +46,6 @@ pub(crate) fn eval(bc: &[ByteCode], input: &[f64], env: &Environment) -> Result<
                 }
 
                 let result = function(&args);
-                if result.is_nan() {
-                    return Err(Error::new(*line, *column, "function returned Nan"));
-                }
-
                 stack.push(result);
             }
             LessThan => {
@@ -67,7 +69,7 @@ pub(crate) fn eval(bc: &[ByteCode], input: &[f64], env: &Environment) -> Result<
             Divide => stack.math(|a, b| a / b)?,
             Remainder => stack.math(|a, b| a % b)?,
             JumpIfZero { offset } => {
-                if stack.pop()? == 0.0 {
+                if stack.pop()?.is_zero() {
                     pc += *offset;
                 }
             }
@@ -91,14 +93,14 @@ pub(crate) fn eval(bc: &[ByteCode], input: &[f64], env: &Environment) -> Result<
     Ok(stack.pop()?)
 }
 
-struct Stack(Vec<f64>);
+struct Stack(Vec<BigDecimal>);
 
 impl Stack {
-    fn push(&mut self, val: f64) {
+    fn push(&mut self, val: BigDecimal) {
         self.0.push(val);
     }
 
-    fn pop(&mut self) -> Result<f64, Error> {
+    fn pop(&mut self) -> Result<BigDecimal, Error> {
         self.0.pop().ok_or(Error::new(0, 0, "VM Error"))
     }
 
@@ -106,16 +108,16 @@ impl Stack {
         self.0.len()
     }
 
-    fn cmp<F: Fn(f64, f64) -> bool>(&mut self, f: F) -> Result<(), Error> {
+    fn cmp<F: Fn(BigDecimal, BigDecimal) -> bool>(&mut self, f: F) -> Result<(), Error> {
         if f(self.pop()?, self.pop()?) {
-            self.push(1.);
+            self.push(BigDecimal::one());
         } else {
-            self.push(0.);
+            self.push(BigDecimal::zero());
         }
         Ok(())
     }
 
-    fn math<F: Fn(f64, f64) -> f64>(&mut self, f: F) -> Result<(), Error> {
+    fn math<F: Fn(BigDecimal, BigDecimal) -> BigDecimal>(&mut self, f: F) -> Result<(), Error> {
         let result = f(self.pop()?, self.pop()?);
         self.push(result);
         Ok(())
